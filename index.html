@@ -27,13 +27,13 @@ button,.btn{background:var(--g);color:#fff;border:0;border-radius:14px;padding:1
 .msg{margin-top:12px;padding:12px;border-radius:12px;font-weight:600}.ok{background:#e3f6ea;color:#14663a}.al{background:#fdeaea;color:#a12a2a}
 table{width:100%;border-collapse:collapse;font-size:.85rem}td,th{padding:7px 4px;border-bottom:1px solid #e6ebf3;text-align:left}
 .sc{overflow-x:auto}
-.tag{font-size:.7rem;padding:2px 8px;border-radius:99px;color:#fff;background:var(--r)}.tag.w{background:var(--o)}
+.tag{display:inline-block;white-space:nowrap;font-size:.7rem;padding:2px 8px;border-radius:99px;color:#fff;background:var(--r)}.tag.w{background:var(--o)}
 .tl{border-left:3px solid var(--g);margin-left:8px;padding-left:14px}.tl p{margin:0 0 12px}.tl b{color:var(--n)}
 nav{position:fixed;left:0;right:0;bottom:0;background:#fff;display:flex;border-top:1px solid #dde3ee;padding-bottom:env(safe-area-inset-bottom,0)}
 nav a{flex:1;text-align:center;padding:9px 0 8px;font-size:.7rem;color:var(--m);text-decoration:none;font-weight:600}
 nav a i{display:block;font-style:normal;font-size:1.4rem}nav a.a{color:var(--o)}
 #qr{display:flex;justify-content:center;padding:10px}
-footer img{width:100%;max-width:420px;display:block;margin:6px auto;opacity:.9}
+footer{padding-bottom:96px}footer img{width:100%;max-width:420px;display:block;margin:6px auto;opacity:.9}
 </style></head><body>
 <header><img src="assets/logos.png" alt="" style="height:38px;border-radius:6px;background:#fff" onerror="this.remove()"><div><b>SYSTEP</b><small>Agri-Track 241 · élevages avicoles</small></div><span id="on">En ligne</span></header>
 <main id="v"></main>
@@ -46,7 +46,7 @@ const F=[...Array(150)].map((_,i)=>{const p=P[Math.floor(R()*9)];return{id:i+1,n
 let E=[];try{E=JSON.parse(localStorage.getItem("systep")||"[]")}catch(e){}
 const save=()=>{try{localStorage.setItem("systep",JSON.stringify(E))}catch(e){}};
 const $=q=>document.querySelector(q),avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
-const alerts=()=>F.flatMap(f=>[...(f.mort>5?[[f,"Mortalité élevée ("+f.mort+" %)",0]]:[]),...(!f.on?[[f,"Saisie manquante",1]]:[])]);
+const alerts=()=>F.flatMap(f=>[...(f.mort>7?[[f,"Mortalité "+f.mort+" %",0]]:[]),...(!f.on?[[f,"Saisie manquante",1]]:[])]);
 const NAV=[["accueil","🏠","Accueil"],["saisie","✍️","Saisie"],["dashboard","📊","National"],["tracabilite","🔎","Traçabilité"]];
 function net(){const o=navigator.onLine;$("#on").textContent=o?"En ligne":"Hors-ligne";$("#on").className=o?"":"off"}
 addEventListener("online",net);addEventListener("offline",net);
@@ -67,7 +67,7 @@ saisie(){return `<div class="card"><h2>Saisie du jour</h2><p style="color:var(--
 dashboard(){const A=alerts(),pm=P.map(p=>{const x=F.filter(f=>f.prov==p[0]);return[p[0],avg(x.map(f=>f.mort))]}),mx=Math.max(...pm.map(x=>x[1]));
 const X=l=>20+(l-8.5)*52,Y=t=>20+(2.4-t)*52;
 return `<div class="grid"><div class="k"><b>${F.filter(f=>f.on).length}/150</b><span>Fermes connectées</span></div><div class="k"><b>${avg(F.map(f=>f.mort)).toFixed(1)} %</b><span>Mortalité moyenne</span></div><div class="k"><b>${avg(F.map(f=>f.ic)).toFixed(2)}</b><span>Indice de consommation</span></div><div class="k"><b style="color:var(--r)">${A.length}</b><span>Alertes actives</span></div></div>
-<div class="card" style="margin-top:12px"><h3>Carte des fermes</h3><svg viewBox="0 0 320 340" width="100%">${F.map(f=>`<circle cx="${X(f.lon)}" cy="${Y(f.lat)}" r="4.5" fill="${!f.on?"#f26b21":f.mort>5?"#d64545":"#1f9d55"}" opacity=".85"/>`).join("")}</svg><small style="color:var(--m)">🟢 normal · 🔴 mortalité élevée · 🟠 hors ligne</small></div>
+<div class="card" style="margin-top:12px"><h3>Carte des fermes</h3><svg viewBox="0 0 320 340" width="100%">${F.map(f=>`<circle cx="${X(f.lon)}" cy="${Y(f.lat)}" r="4.5" fill="${!f.on?"#f26b21":f.mort>7?"#d64545":"#1f9d55"}" opacity=".85"/>`).join("")}</svg><small style="color:var(--m)">🟢 normal · 🔴 mortalité élevée · 🟠 hors ligne</small></div>
 <div class="card"><h3>Mortalité moyenne par province (%)</h3><svg viewBox="0 0 320 ${pm.length*26}" width="100%">${pm.map((p,i)=>`<text x="0" y="${i*26+16}" font-size="11" fill="#16213e">${p[0]}</text><rect x="105" y="${i*26+5}" width="${p[1]/mx*180}" height="15" rx="4" fill="${p[1]>4?"#f26b21":"#1f9d55"}"/><text x="${110+p[1]/mx*180}" y="${i*26+17}" font-size="11" fill="#64708a">${p[1].toFixed(1)}</text>`).join("")}</svg></div>
 <div class="card sc"><h3>Alertes à traiter</h3><table><tr><th>Ferme</th><th>Province</th><th>Alerte</th></tr>${A.slice(0,10).map(a=>`<tr><td>${a[0].nom}</td><td>${a[0].prov}</td><td><span class="tag ${a[2]?"w":""}">${a[1]}</span></td></tr>`).join("")}</table></div>
 <button id="csv" class="btn2">⬇️ Exporter en CSV</button>`},
@@ -86,4 +86,5 @@ addEventListener("hashchange",go);net();go();
 if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 <footer><img src="assets/fermes.png" alt="" onerror="this.remove()"></footer>
+<script type="module" src="shell.js"></script>
 </body></html>

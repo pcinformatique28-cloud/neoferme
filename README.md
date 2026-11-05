@@ -3,3 +3,4 @@ Prototype PWA de suivi technico-économique et traçabilité des 150 fermes avic
 Candidature : https://kimba.cloud (avant le 8 novembre 2026).
 Test local : `python3 -m http.server 8080` puis ouvrir http://localhost:8080
 Déploiement Termux : `bash deploy-termux.sh`
+Version 0.2 : connexion Firebase, menu, cloche, admin. Règles : firestore.rules

@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signed() { return request.auth != null; }
+    function me() { return get(/databases/$(db)/documents/users/$(request.auth.uid)).data; }
+    function isAdmin() {
+      return signed() && (
+        (request.auth.token.email == 'pcinformatique28@gmail.com' && request.auth.token.email_verified == true)
+        || me().role == 'admin');
+    }
+    function isStaff() { return isAdmin() || me().role in ['technicien', 'ministere']; }
+    match /users/{uid} {
+      allow read: if signed() && (request.auth.uid == uid || isStaff());
+      allow create: if signed() && request.auth.uid == uid
+        && request.resource.data.role == 'eleveur' && request.resource.data.status == 'actif';
+      allow update: if signed() && ((request.auth.uid == uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.status == resource.data.status) || isAdmin());
+      allow delete: if isAdmin();
+    }
+    match /farms/{id} { allow read: if signed() && (isStaff() || resource.data.ownerId == request.auth.uid); allow write: if isAdmin(); }
+    match /lots/{id} { allow read: if true; allow write: if isStaff(); }
+    match /entries/{id} {
+      allow read: if signed() && (isStaff() || resource.data.authorId == request.auth.uid);
+      allow create: if signed() && request.resource.data.authorId == request.auth.uid;
+      allow update, delete: if isStaff();
+    }
+    match /alerts/{id} { allow read, write: if isStaff(); }
+    match /notifications/{id} {
+      allow read: if signed() && (resource.data.to == request.auth.uid || resource.data.to == 'all' || isStaff());
+      allow write: if isAdmin();
+    }
+    match /settings/{id} { allow read: if signed(); allow write: if isAdmin(); }
+    match /auditLogs/{id} { allow read: if isAdmin(); allow create: if signed(); }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
