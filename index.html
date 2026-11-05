@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SYSTEP · Agri-Track 241</title>
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0b1f4d">
+<style>
+:root{--n:#0b1f4d;--o:#f26b21;--g:#1f9d55;--y:#fcd116;--b:#3a75c4;--bg:#f6f8fb;--c:#fff;--t:#16213e;--m:#64708a;--r:#d64545}
+*{box-sizing:border-box}html{box-sizing:border-box;padding-top:env(safe-area-inset-top,0)}
+body{margin:0;font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--t);padding-bottom:calc(76px + env(safe-area-inset-bottom,0))}
+header{background:var(--n);color:#fff;padding:14px 16px;display:flex;gap:12px;align-items:center;border-bottom:5px solid;border-image:linear-gradient(90deg,var(--g) 33%,var(--y) 33% 66%,var(--b) 66%) 1}
+header b{font-size:1.25rem;letter-spacing:.5px}header small{display:block;opacity:.75;font-size:.75rem}
+#on{margin-left:auto;font-size:.72rem;padding:3px 9px;border-radius:99px;background:var(--g)}#on.off{background:var(--o)}
+main{max-width:860px;margin:0 auto;padding:14px}
+.card{background:var(--c);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px #0b1f4d1a}
+h2{margin:.2em 0 .5em;color:var(--n)}h3{margin:.2em 0;color:var(--n);font-size:1rem}
+.hero img{width:100%;border-radius:10px;display:block}
+.big{font-size:3.4rem;font-weight:800;color:var(--o);line-height:1}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.k{background:var(--c);border-radius:12px;padding:12px;box-shadow:0 1px 3px #0b1f4d1a}
+.k b{display:block;font-size:1.7rem;color:var(--n)}.k span{font-size:.78rem;color:var(--m)}
+.pill{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;font-size:.8rem;font-weight:600}
+.pill div{background:#eef3fb;border-radius:12px;padding:12px 4px}.pill i{font-style:normal;font-size:1.7rem;display:block}
+label{display:block;font-weight:600;margin:12px 0 4px}
+select,input{width:100%;padding:14px;font-size:1.05rem;border:2px solid #d5dcea;border-radius:12px;background:#fff}
+button,.btn{background:var(--g);color:#fff;border:0;border-radius:14px;padding:16px;font-size:1.1rem;font-weight:700;width:100%;margin-top:14px;cursor:pointer;text-align:center;display:block;text-decoration:none}
+.btn2{background:var(--n)}
+.msg{margin-top:12px;padding:12px;border-radius:12px;font-weight:600}.ok{background:#e3f6ea;color:#14663a}.al{background:#fdeaea;color:#a12a2a}
+table{width:100%;border-collapse:collapse;font-size:.85rem}td,th{padding:7px 4px;border-bottom:1px solid #e6ebf3;text-align:left}
+.sc{overflow-x:auto}
+.tag{font-size:.7rem;padding:2px 8px;border-radius:99px;color:#fff;background:var(--r)}.tag.w{background:var(--o)}
+.tl{border-left:3px solid var(--g);margin-left:8px;padding-left:14px}.tl p{margin:0 0 12px}.tl b{color:var(--n)}
+nav{position:fixed;left:0;right:0;bottom:0;background:#fff;display:flex;border-top:1px solid #dde3ee;padding-bottom:env(safe-area-inset-bottom,0)}
+nav a{flex:1;text-align:center;padding:9px 0 8px;font-size:.7rem;color:var(--m);text-decoration:none;font-weight:600}
+nav a i{display:block;font-style:normal;font-size:1.4rem}nav a.a{color:var(--o)}
+#qr{display:flex;justify-content:center;padding:10px}
+footer img{width:100%;max-width:420px;display:block;margin:6px auto;opacity:.9}
+</style></head><body>
+<header><img src="assets/logos.png" alt="" style="height:38px;border-radius:6px;background:#fff" onerror="this.remove()"><div><b>SYSTEP</b><small>Agri-Track 241 · élevages avicoles</small></div><span id="on">En ligne</span></header>
+<main id="v"></main>
+<nav id="nav"></nav>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const P=[["Estuaire",9.45,.4],["Haut-Ogooué",13.9,-1.6],["Moyen-Ogooué",10.5,-.6],["Ngounié",11.2,-1.8],["Nyanga",11,-3],["Ogooué-Ivindo",12.8,.5],["Ogooué-Lolo",12.5,-.9],["Ogooué-Maritime",9.6,-1.3],["Woleu-Ntem",11.6,1.6]];
+let s=7;const R=()=>(s=(s*16807)%2147483647)/2147483647;
+const F=[...Array(150)].map((_,i)=>{const p=P[Math.floor(R()*9)];return{id:i+1,nom:"Ferme "+String(i+1).padStart(3,"0"),prov:p[0],lon:p[1]+(R()-.5)*1.4,lat:p[2]+(R()-.5)*1.1,eff:Math.round(500+R()*4500),mort:+(1+R()*7).toFixed(1),ic:+(1.5+R()*.6).toFixed(2),on:R()<.93,lot:"LOT-"+(2611000+i)}});
+let E=[];try{E=JSON.parse(localStorage.getItem("systep")||"[]")}catch(e){}
+const save=()=>{try{localStorage.setItem("systep",JSON.stringify(E))}catch(e){}};
+const $=q=>document.querySelector(q),avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+const alerts=()=>F.flatMap(f=>[...(f.mort>5?[[f,"Mortalité élevée ("+f.mort+" %)",0]]:[]),...(!f.on?[[f,"Saisie manquante",1]]:[])]);
+const NAV=[["accueil","🏠","Accueil"],["saisie","✍️","Saisie"],["dashboard","📊","National"],["tracabilite","🔎","Traçabilité"]];
+function net(){const o=navigator.onLine;$("#on").textContent=o?"En ligne":"Hors-ligne";$("#on").className=o?"":"off"}
+addEventListener("online",net);addEventListener("offline",net);
+const V={
+accueil(){const j=Math.ceil((new Date(2027,0,1)-Date.now())/864e5),n=F.filter(f=>f.on).length;
+return `<div class="card hero"><img src="assets/challenge.png" alt="Challenge national Agri-Track 241" onerror="this.remove()"></div>
+<div class="card"><h2>150 fermes avicoles, un défi numérique national</h2><p>Suivre chaque ferme du programme POUFA, tracer chaque lot, du poussin à l’assiette.</p>
+<div class="grid"><div class="k"><span class="big">${n}</span><span>/ 150 fermes connectées</span></div><div class="k"><span class="big" style="color:var(--g)">${j}</span><span>jours avant l’arrêt des importations de poulet (1<sup>er</sup> janv. 2027)</span></div></div></div>
+<div class="card"><div class="pill"><div><i>📋</i>Suivi technico-économique</div><div><i>🛡️</i>Traçabilité</div><div><i>💡</i>Innovation</div></div></div>
+<a class="btn" href="#saisie">✍️ Saisir la journée</a><a class="btn btn2" href="#dashboard">📊 Tableau de bord national</a>`},
+saisie(){return `<div class="card"><h2>Saisie du jour</h2><p style="color:var(--m);margin:0">Moins de 60 secondes. Fonctionne sans réseau.</p>
+<label>Ma ferme</label><select id="f">${F.slice(0,30).map(f=>`<option value="${f.id}">${f.nom} · ${f.prov}</option>`).join("")}</select>
+<label>🐔 Poulets morts aujourd’hui</label><input id="m" type="number" inputmode="numeric" min="0" value="0">
+<label>🌾 Aliment distribué (kg)</label><input id="a" type="number" inputmode="decimal" min="0" value="0">
+<label>💉 Vaccin / traitement</label><select id="vx"><option>Aucun</option><option>Newcastle</option><option>Gumboro</option><option>Bronchite</option><option>Vitamines</option></select>
+<button id="ok">✅ Enregistrer</button><div id="r"></div></div>
+<div class="card"><h3>Dernières saisies (${E.length})</h3>${E.slice(-5).reverse().map(e=>`<p style="margin:4px 0;font-size:.85rem">${e.d} · ${e.nom} · ${e.m} morts · ${e.a} kg ${e.sync?"":"<span class='tag w'>à synchroniser</span>"}</p>`).join("")||"<p style='color:var(--m)'>Aucune saisie.</p>"}</div>`},
+dashboard(){const A=alerts(),pm=P.map(p=>{const x=F.filter(f=>f.prov==p[0]);return[p[0],avg(x.map(f=>f.mort))]}),mx=Math.max(...pm.map(x=>x[1]));
+const X=l=>20+(l-8.5)*52,Y=t=>20+(2.4-t)*52;
+return `<div class="grid"><div class="k"><b>${F.filter(f=>f.on).length}/150</b><span>Fermes connectées</span></div><div class="k"><b>${avg(F.map(f=>f.mort)).toFixed(1)} %</b><span>Mortalité moyenne</span></div><div class="k"><b>${avg(F.map(f=>f.ic)).toFixed(2)}</b><span>Indice de consommation</span></div><div class="k"><b style="color:var(--r)">${A.length}</b><span>Alertes actives</span></div></div>
+<div class="card" style="margin-top:12px"><h3>Carte des fermes</h3><svg viewBox="0 0 320 340" width="100%">${F.map(f=>`<circle cx="${X(f.lon)}" cy="${Y(f.lat)}" r="4.5" fill="${!f.on?"#f26b21":f.mort>5?"#d64545":"#1f9d55"}" opacity=".85"/>`).join("")}</svg><small style="color:var(--m)">🟢 normal · 🔴 mortalité élevée · 🟠 hors ligne</small></div>
+<div class="card"><h3>Mortalité moyenne par province (%)</h3><svg viewBox="0 0 320 ${pm.length*26}" width="100%">${pm.map((p,i)=>`<text x="0" y="${i*26+16}" font-size="11" fill="#16213e">${p[0]}</text><rect x="105" y="${i*26+5}" width="${p[1]/mx*180}" height="15" rx="4" fill="${p[1]>4?"#f26b21":"#1f9d55"}"/><text x="${110+p[1]/mx*180}" y="${i*26+17}" font-size="11" fill="#64708a">${p[1].toFixed(1)}</text>`).join("")}</svg></div>
+<div class="card sc"><h3>Alertes à traiter</h3><table><tr><th>Ferme</th><th>Province</th><th>Alerte</th></tr>${A.slice(0,10).map(a=>`<tr><td>${a[0].nom}</td><td>${a[0].prov}</td><td><span class="tag ${a[2]?"w":""}">${a[1]}</span></td></tr>`).join("")}</table></div>
+<button id="csv" class="btn2">⬇️ Exporter en CSV</button>`},
+tracabilite(){const h=decodeURIComponent(location.hash.split("lot=")[1]||""),f=F.find(x=>x.lot==h)||F[0];
+return `<div class="card"><h2>Traçabilité d’un lot</h2><label>Lot</label><select id="l">${F.slice(0,30).map(x=>`<option ${x.lot==f.lot?"selected":""}>${x.lot}</option>`).join("")}</select>
+<h3 style="margin-top:14px">${f.lot} · ${f.nom} (${f.prov})</h3><div class="tl"><p><b>Jour 0</b><br>Mise en place de ${f.eff} poussins</p><p><b>Jours 1 à 35</b><br>Aliment contrôlé · IC ${f.ic}</p><p><b>Jours 7 et 14</b><br>Vaccins Newcastle et Gumboro ✔</p><p><b>Jour 42</b><br>Contrôle technicien · mortalité ${f.mort} %</p><p><b>Vente</b><br>Lot certifié origine Gabon 🇬🇦</p></div>
+<div id="qr"></div><small style="color:var(--m)">Scannez pour vérifier l’origine du lot.</small></div>`}};
+function go(){let h=location.hash.slice(1)||"accueil";if(h.startsWith("lot="))h="tracabilite";if(!V[h])h="accueil";
+$("#v").innerHTML=V[h]();$("#nav").innerHTML=NAV.map(n=>`<a href="#${n[0]}" class="${n[0]==h?"a":""}"><i>${n[1]}</i>${n[2]}</a>`).join("");scrollTo(0,0);
+if(h=="saisie")$("#ok").onclick=()=>{const f=F.find(x=>x.id==$("#f").value),m=+$("#m").value||0,a=+$("#a").value||0,p=m/f.eff*100;
+E.push({d:new Date().toLocaleDateString("fr-FR"),nom:f.nom,m,a,vx:$("#vx").value,sync:navigator.onLine});save();f.on=true;
+$("#r").innerHTML=p>.5?`<div class="msg al">⚠️ Alerte : mortalité du jour ${p.toFixed(2)} %. Un technicien sera prévenu.</div>`:`<div class="msg ok">✅ Saisie enregistrée${navigator.onLine?"":" (synchronisation au retour du réseau)"}.</div>`};
+if(h=="dashboard")$("#csv").onclick=()=>{const t="ferme,province,effectif,mortalite,ic,connectee\n"+F.map(f=>[f.nom,f.prov,f.eff,f.mort,f.ic,f.on].join(",")).join("\n"),u=URL.createObjectURL(new Blob([t],{type:"text/csv"})),a=document.createElement("a");a.href=u;a.download="systep-fermes.csv";a.click()};
+if(h=="tracabilite"){const l=$("#l");l.onchange=()=>{location.hash="lot="+l.value};try{new QRCode($("#qr"),{text:location.origin+location.pathname+"#lot="+l.value,width:150,height:150})}catch(e){$("#qr").textContent="QR indisponible hors-ligne"}}}
+addEventListener("hashchange",go);net();go();
+if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+<footer><img src="assets/fermes.png" alt="" onerror="this.remove()"></footer>
+</body></html>
