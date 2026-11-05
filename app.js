@@ -45,32 +45,38 @@ const isStaff = () => STAFF.includes(ROLE);
 // ---- données ----
 async function load() {
   try { EX = (await getDocs(collection(db, "exploitations"))).docs.map(d => ({ id: d.id, ...d.data() })); } catch (e) { EX = []; }
+  if (!U) { SA = []; return; }
   try { SA = (await getDocs(collection(db, "saisies"))).docs.map(d => ({ id: d.id, ...d.data() })).filter(s => isStaff() || s.uid === U.uid); } catch (e) { SA = []; }
 }
 onAuthStateChanged(auth, async u => {
-  U = u;
-  if (u) { try { const d = await getDoc(doc(db, "users", u.uid)); ROLE = d.exists() ? (d.data().role || "eleveur") : "eleveur"; } catch (e) {} await load(); if (location.hash.startsWith("#lot=")) { view = "fiche"; cur = location.hash.slice(5); } }
+  U = u; ROLE = "eleveur";
+  if (u) { try { const d = await getDoc(doc(db, "users", u.uid)); ROLE = d.exists() ? (d.data().role || "eleveur") : "eleveur"; } catch (e) {} }
+  await load();
+  if (u) { if (view === "login") view = "home"; if (location.hash.startsWith("#lot=")) { view = "fiche"; cur = location.hash.slice(5); } }
+  else if (!["home", "how", "about"].includes(view)) view = "home";
   render();
 });
 
 // ---- navigation ----
+const PUB = [["home", "🏠", "Accueil"], ["how", "❓", "Aide"], ["about", "ℹ️", "À propos"], ["login", "🔑", "Connexion"]];
 const TABS = [["home", "🏠", "Accueil"], ["saisie", "✍️", "Saisie"], ["fermes", "🌾", "Exploitations"], ["national", "📊", "National"], ["trace", "🔎", "Traçabilité"]];
-A.go = (v, id) => { view = v; cur = id || null; $("#drawer").classList.remove("open"); window.scrollTo(0, 0); render(); };
+A.go = (v, id) => { if (!U && !["home", "how", "about", "login"].includes(v)) v = "login"; view = v; cur = id || null; $("#drawer").classList.remove("open"); window.scrollTo(0, 0); render(); };
 A.menu = () => {
-  const items = [...TABS, ["notif", "🔔", "Notifications"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"]];
+  const items = U ? [...TABS, ["notif", "🔔", "Notifications"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"]] : [["home", "🏠", "Accueil"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"], ["login", "🔑", "Connexion"]];
   if (isStaff()) items.splice(5, 0, ["admin", "🛠️", "Administration"]);
-  $("#drawer").innerHTML = `<div class="dp"><b>Neoferme</b><br><small>${esc(U?.email || "")}<br>Rôle : ${esc(ROLE)}</small><hr>${items.map(i => `<a onclick="A.go('${i[0]}')">${i[1]} ${i[2]}</a>`).join("")}<a onclick="A.out()">🚪 Déconnexion</a></div><div class="dbg" onclick="A.menu()"></div>`;
+  $("#drawer").innerHTML = `<div class="dp"><b>Neoferme</b><br><small>${U ? esc(U.email) + "<br>Rôle : " + esc(ROLE) : "Visiteur"}</small><hr>${items.map(i => `<a onclick="A.go('${i[0]}')">${i[1]} ${i[2]}</a>`).join("")}${U ? '<a onclick="A.out()">🚪 Déconnexion</a>' : ""}</div><div class="dbg" onclick="A.menu()"></div>`;
   $("#drawer").classList.toggle("open");
 };
-A.user = () => U ? A.menu() : A.go("home");
+A.user = () => U ? A.menu() : A.go("login");
 A.out = () => { signOut(auth); $("#drawer").classList.remove("open"); };
 
 function render() {
-  $("#nav").innerHTML = U ? TABS.map(t => `<a class="${view === t[0] ? "on" : ""}" onclick="A.go('${t[0]}')"><span>${t[1]}</span>${t[2]}</a>`).join("") : "";
+  $("#nav").innerHTML = (U ? TABS : PUB).map(t => `<a class="${view === t[0] ? "on" : ""}" onclick="A.go('${t[0]}')"><span>${t[1]}</span>${t[2]}</a>`).join("");
   $("#badge").style.display = alerts().length ? "block" : "none";
   if (map) { map.remove(); map = null; }
   const main = $("#main");
-  if (!U) { main.innerHTML = loginV(); return; }
+  if (!U && !["home", "how", "about"].includes(view)) view = "login";
+  if (!U && view === "login") { main.innerHTML = loginV(); return; }
   main.innerHTML = ({ home: homeV, saisie: saisieV, fermes: fermesV, national: nationalV, trace: traceV, notif: notifV, how: howV, about: aboutV, admin: adminV, fiche: ficheV, nouveau: nouveauV }[view] || homeV)();
   if (view === "home" || view === "national") initMap();
   if (view === "nouveau") A.sect();
@@ -81,8 +87,8 @@ const loginV = () => `<div class="card login"><h2>Neoferme</h2><p class="mut">De
 ${mode === "reg" ? `<label>Nom complet<input id="nom"></label><label>Je suis<select id="role"><option value="eleveur">Éleveur</option><option value="agriculteur">Agriculteur</option></select></label>` : ""}
 <label>E-mail<input id="em" type="email"></label><label>Mot de passe<input id="pw" type="password"></label>
 <button class="b g" onclick="A.auth()">${mode === "login" ? "Se connecter" : "Créer mon compte"}</button>
-<button class="b n" onclick="mode='${mode === "login" ? "reg" : "login"}';A.go('home')">${mode === "login" ? "Créer un compte" : "Retour à la connexion"}</button>
-<a class="lk" onclick="A.reset()">Mot de passe oublié ?</a><p id="msg" class="err"></p><p class="mut cr">Une réalisation PC-INFORMATIQUE · 11<sup>e</sup> application du studio</p></div>`;
+<button class="b n" onclick="mode='${mode === "login" ? "reg" : "login"}';A.go('login')">${mode === "login" ? "Créer un compte" : "Retour à la connexion"}</button>
+<a class="lk" onclick="A.reset()">Mot de passe oublié ?</a><a class="lk" onclick="A.go('home')">← Retour à l'accueil</a><p id="msg" class="err"></p><p class="mut cr">Une réalisation PC-INFORMATIQUE · 11<sup>e</sup> application du studio</p></div>`;
 window.mode = "login";
 Object.defineProperty(window, "mode", { get: () => mode, set: v => mode = v });
 A.auth = async () => {
@@ -111,7 +117,9 @@ const opts = (a, v, all) => `<option value="">${all}</option>` + a.map(x => `<op
 const catList = () => F.sec ? Object.keys(SEC[F.sec]) : Object.values(SEC).flatMap(Object.keys);
 const villeList = () => F.prov ? Object.keys(PROVINCES[F.prov].villes) : Object.values(PROVINCES).flatMap(p => Object.keys(p.villes));
 function tilesV() {
-  const fl = EX.filter(match), mine = isStaff() ? fl : fl.filter(e => e.uid === U.uid);
+  const fl0 = EX.filter(match);
+  if (!U) { const n = k => new Set(fl0.map(e => e[k])).size; return tile("🌾", fl0.length, "Exploitations", "home") + tile("🐔", fl0.reduce((a, e) => a + num(e.effectif), 0), "Effectif total", "home") + tile("🗺️", n("province"), "Provinces couvertes", "home") + tile("🏷️", n("categorie"), "Catégories", "home") + tile("🔑", "→", "Se connecter", "login") + tile("➕", "+", "Inscrire mon exploitation", "login"); }
+  const fl = fl0, mine = isStaff() ? fl : fl.filter(e => e.uid === U.uid);
   const eff = mine.reduce((a, e) => a + num(e.effectif), 0), mm = mine.length ? (mine.reduce((a, e) => a + mort(e), 0) / mine.length).toFixed(1) : "0.0";
   return tile("🌾", mine.length, isStaff() ? "Exploitations" : "Mes exploitations", "fermes") + tile("🐔", eff, "Effectif total", "fermes") + tile("📉", mm + " %", "Mortalité moyenne", "national")
     + tile("🚨", mine.filter(e => mort(e) > 5).length, "Alertes actives", "notif") + tile("✍️", SA.length, "Saisies", "saisie") + tile("➕", "+", "Ajouter une exploitation", "nouveau");
@@ -122,20 +130,21 @@ function homeV() {
 <label>Catégorie<select id="fc" onchange="A.filt()">${opts(catList(), F.cat, "Toutes les catégories")}</select></label>
 <label>Province<select id="fp" onchange="A.filt('prov')">${opts(Object.keys(PROVINCES), F.prov, "Toutes les provinces")}</select></label>
 <label>Ville<select id="fv" onchange="A.filt()">${opts(villeList(), F.ville, "Toutes les villes")}</select></label>
-<label>État<select id="ft" onchange="A.filt()"><option value="">Tous</option><option value="normal" ${F.st === "normal" ? "selected" : ""}>Normal</option><option value="alerte" ${F.st === "alerte" ? "selected" : ""}>En alerte (mortalité élevée)</option></select></label>
+${U ? `<label>État<select id="ft" onchange="A.filt()"><option value="">Tous</option><option value="normal" ${F.st === "normal" ? "selected" : ""}>Normal</option><option value="alerte" ${F.st === "alerte" ? "selected" : ""}>En alerte (mortalité élevée)</option></select></label>` : ""}
 <button class="b n" onclick="A.freset()">Réinitialiser</button></div></div>
 <div id="map" class="map"></div><div id="rs"></div><div class="tiles" id="tl">${tilesV()}</div>`;
 }
 A.fp = () => $("#fpn").classList.toggle("open");
 A.freset = () => { F = { q: "", sec: "", cat: "", prov: "", ville: "", st: "" }; render(); };
 A.filt = k => {
-  F.q = $("#fq").value; F.sec = $("#fs").value; F.cat = k === "sec" ? "" : $("#fc").value; F.prov = $("#fp").value; F.ville = k === "prov" ? "" : $("#fv").value; F.st = $("#ft").value;
+  F.q = $("#fq").value; F.sec = $("#fs").value; F.cat = k === "sec" ? "" : $("#fc").value; F.prov = $("#fp").value; F.ville = k === "prov" ? "" : $("#fv").value; F.st = $("#ft") ? $("#ft").value : "";
   $("#fc").innerHTML = opts(catList(), F.cat, "Toutes les catégories"); $("#fv").innerHTML = opts(villeList(), F.ville, "Toutes les villes");
   refreshHome();
 };
 A.focus = id => { const m = MK[id]; if (m && map) { $("#map").scrollIntoView({ behavior: "smooth" }); map.setView(m.getLatLng(), 13); m.openPopup(); } };
-const mkr = e => L.circleMarker([e.lat, e.lng], { radius: 8, color: "#fff", weight: 2, fillColor: status(e), fillOpacity: .95 })
-  .bindPopup(`<b>${esc(e.nom)}</b><br>${esc(e.categorie)} · ${esc(e.ville)}<br><a href="#" onclick="A.go('fiche','${e.id}');return false">Voir la fiche</a>`);
+const pos = e => U && (isStaff() || e.uid === U.uid) ? [e.lat, e.lng] : [+e.lat.toFixed(2), +e.lng.toFixed(2)];
+const mkr = e => L.circleMarker(pos(e), { radius: 8, color: "#fff", weight: 2, fillColor: status(e), fillOpacity: .95 })
+  .bindPopup(`<b>${esc(e.nom)}</b><br>${esc(e.categorie)} · ${esc(e.ville)}<br><a href="#" onclick="A.go('fiche','${e.id}');return false">${U ? "Voir la fiche" : "Se connecter pour voir la fiche"}</a>`);
 function refreshHome() {
   const fl = EX.filter(match), on = F.q || nF(), pts = fl.filter(e => e.lat);
   if (map && ML) {
@@ -143,7 +152,7 @@ function refreshHome() {
     if (on && pts.length) map.fitBounds(pts.map(e => [e.lat, e.lng]), { maxZoom: 11, padding: [30, 30] }); else if (!on) map.setView([-0.8, 11.6], 6);
   }
   $("#tl").innerHTML = tilesV(); $("#fb").textContent = nF() || "";
-  $("#rs").innerHTML = on ? `<div class="card"><b>${fl.length} résultat(s)</b>${fl.slice(0, 8).map(e => `<div class="row" onclick="A.focus('${e.id}')"><b>${esc(e.nom)}</b><small>${esc(e.categorie)} · ${esc(e.ville)} (${esc(e.province)}) · ${mort(e).toFixed(1)} %</small></div>`).join("")}${fl.length > 8 ? `<p class="mut">+ ${fl.length - 8} autres : affinez la recherche</p>` : ""}${fl.length ? "" : "<p class='mut'>Aucun résultat.</p>"}</div>` : "";
+  $("#rs").innerHTML = on ? `<div class="card"><b>${fl.length} résultat(s)</b>${fl.slice(0, 8).map(e => `<div class="row" onclick="A.focus('${e.id}')"><b>${esc(e.nom)}</b><small>${esc(e.categorie)} · ${esc(e.ville)} (${esc(e.province)})${U ? " · " + mort(e).toFixed(1) + " %" : ""}</small></div>`).join("")}${fl.length > 8 ? `<p class="mut">+ ${fl.length - 8} autres : affinez la recherche</p>` : ""}${fl.length ? "" : "<p class='mut'>Aucun résultat.</p>"}</div>` : "";
 }
 function initMap() {
   if (!window.L || !$("#map")) return;
@@ -182,7 +191,7 @@ A.save = async () => {
   const nom = $("#xn").value.trim(); if (!nom) return $("#msg").textContent = "Nom requis";
   const v = PROVINCES[$("#prov").value].villes[$("#ville").value], details = {};
   document.querySelectorAll(".d").forEach(i => details[i.dataset.k] = i.value);
-  const e = { uid: U.uid, email: U.email, nom, secteur: $("#sec").value, categorie: $("#cat").value, details, effectif: num($("#effectif").value), surface: num($("#surface").value), production: num($("#prod").value),
+  const e = { uid: U.uid, nom, secteur: $("#sec").value, categorie: $("#cat").value, details, effectif: num($("#effectif").value), surface: num($("#surface").value), production: num($("#prod").value),
     province: $("#prov").value, ville: $("#ville").value, quartier: $("#quartier").value, village: $("#village").value, lat: parseFloat($("#lat").value) || v.lat, lng: parseFloat($("#lng").value) || v.lng, created: serverTimestamp() };
   try { await addDoc(collection(db, "exploitations"), e); await load(); A.go("fermes"); } catch (x) { $("#msg").textContent = x.code || x.message; }
 };
@@ -229,8 +238,8 @@ function adminV() {
 <div class="card" id="print"><h3>Neoferme — Synthèse nationale (${new Date().toLocaleDateString("fr-FR")})</h3>${tbl("Synthèse par catégorie", group(e => e.secteur + " / " + e.categorie))}${tbl("Synthèse par province", group(e => e.province))}
 <h4>Fiches individuelles</h4><table><tr><th>Nom</th><th>Catégorie</th><th>Lieu</th><th>Eff.</th><th>Mort. %</th></tr>${EX.map(e => `<tr onclick="A.go('fiche','${e.id}')"><td>${esc(e.nom)}</td><td>${esc(e.categorie)}</td><td>${esc(e.ville)}</td><td>${e.effectif || ""}</td><td>${mort(e).toFixed(1)}</td></tr>`).join("")}</table></div>`;
 }
-A.csv = () => { const h = ["id", "nom", "secteur", "categorie", "province", "ville", "quartier", "village", "lat", "lng", "effectif", "surface_ha", "production_kg", "mortalite_%", "email"];
-  const r = EX.map(e => [e.id, e.nom, e.secteur, e.categorie, e.province, e.ville, e.quartier, e.village, e.lat, e.lng, e.effectif, e.surface, e.production, mort(e).toFixed(1), e.email].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"));
+A.csv = () => { const h = ["id", "nom", "secteur", "categorie", "province", "ville", "quartier", "village", "lat", "lng", "effectif", "surface_ha", "production_kg", "mortalite_%"];
+  const r = EX.map(e => [e.id, e.nom, e.secteur, e.categorie, e.province, e.ville, e.quartier, e.village, e.lat, e.lng, e.effectif, e.surface, e.production, mort(e).toFixed(1)].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"));
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + h.join(";") + "\n" + r.join("\n")], { type: "text/csv" })); a.download = "neoferme-exploitations.csv"; a.click(); };
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
