@@ -101,21 +101,56 @@ A.reset = async () => { const e = $("#em").value.trim(); if (!e) return $("#msg"
 // ---- accueil : carte au premier plan ----
 const alerts = () => EX.filter(e => mort(e) > 5);
 const tile = (ic, n, l, go) => `<div class="tile" onclick="A.go('${go}')"><span>${ic}</span><b>${n}</b><small>${l}</small></div>`;
+const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+let F = { q: "", sec: "", cat: "", prov: "", ville: "", st: "" }, ML, MK = {};
+const match = e => (!F.sec || e.secteur === F.sec) && (!F.cat || e.categorie === F.cat) && (!F.prov || e.province === F.prov) && (!F.ville || e.ville === F.ville)
+  && (F.st !== "alerte" || mort(e) > 5) && (F.st !== "normal" || mort(e) <= 5)
+  && (!F.q || norm([e.nom, e.categorie, e.secteur, e.province, e.ville, e.quartier, e.village].join(" ")).includes(norm(F.q)));
+const nF = () => ["sec", "cat", "prov", "ville", "st"].filter(k => F[k]).length;
+const opts = (a, v, all) => `<option value="">${all}</option>` + a.map(x => `<option ${x === v ? "selected" : ""}>${esc(x)}</option>`).join("");
+const catList = () => F.sec ? Object.keys(SEC[F.sec]) : Object.values(SEC).flatMap(Object.keys);
+const villeList = () => F.prov ? Object.keys(PROVINCES[F.prov].villes) : Object.values(PROVINCES).flatMap(p => Object.keys(p.villes));
+function tilesV() {
+  const fl = EX.filter(match), mine = isStaff() ? fl : fl.filter(e => e.uid === U.uid);
+  const eff = mine.reduce((a, e) => a + num(e.effectif), 0), mm = mine.length ? (mine.reduce((a, e) => a + mort(e), 0) / mine.length).toFixed(1) : "0.0";
+  return tile("🌾", mine.length, isStaff() ? "Exploitations" : "Mes exploitations", "fermes") + tile("🐔", eff, "Effectif total", "fermes") + tile("📉", mm + " %", "Mortalité moyenne", "national")
+    + tile("🚨", mine.filter(e => mort(e) > 5).length, "Alertes actives", "notif") + tile("✍️", SA.length, "Saisies", "saisie") + tile("➕", "+", "Ajouter une exploitation", "nouveau");
+}
 function homeV() {
-  const mine = isStaff() ? EX : EX.filter(e => e.uid === U.uid);
-  const eff = mine.reduce((a, e) => a + num(e.effectif), 0);
-  const mm = mine.length ? (mine.reduce((a, e) => a + mort(e), 0) / mine.length).toFixed(1) : "0.0";
-  return `<div id="map" class="map"></div><div class="tiles">
-${tile("🌾", mine.length, isStaff() ? "Exploitations" : "Mes exploitations", "fermes")}${tile("🐔", eff, "Effectif total", "fermes")}
-${tile("📉", mm + " %", "Mortalité moyenne", "national")}${tile("🚨", alerts().length, "Alertes actives", "notif")}
-${tile("✍️", SA.length, "Saisies", "saisie")}${tile("➕", "+", "Ajouter une exploitation", "nouveau")}</div>`;
+  return `<div class="srch"><div class="sbar"><span>🔍</span><input id="fq" value="${esc(F.q)}" placeholder="Rechercher : nom, ville, quartier, culture…" oninput="A.filt()"><button onclick="A.fp()">⚙️<i id="fb"></i></button></div>
+<div id="fpn" class="fpn${nF() ? " open" : ""}"><label>Secteur<select id="fs" onchange="A.filt('sec')">${opts(Object.keys(SEC), F.sec, "Tous les secteurs")}</select></label>
+<label>Catégorie<select id="fc" onchange="A.filt()">${opts(catList(), F.cat, "Toutes les catégories")}</select></label>
+<label>Province<select id="fp" onchange="A.filt('prov')">${opts(Object.keys(PROVINCES), F.prov, "Toutes les provinces")}</select></label>
+<label>Ville<select id="fv" onchange="A.filt()">${opts(villeList(), F.ville, "Toutes les villes")}</select></label>
+<label>État<select id="ft" onchange="A.filt()"><option value="">Tous</option><option value="normal" ${F.st === "normal" ? "selected" : ""}>Normal</option><option value="alerte" ${F.st === "alerte" ? "selected" : ""}>En alerte (mortalité élevée)</option></select></label>
+<button class="b n" onclick="A.freset()">Réinitialiser</button></div></div>
+<div id="map" class="map"></div><div id="rs"></div><div class="tiles" id="tl">${tilesV()}</div>`;
+}
+A.fp = () => $("#fpn").classList.toggle("open");
+A.freset = () => { F = { q: "", sec: "", cat: "", prov: "", ville: "", st: "" }; render(); };
+A.filt = k => {
+  F.q = $("#fq").value; F.sec = $("#fs").value; F.cat = k === "sec" ? "" : $("#fc").value; F.prov = $("#fp").value; F.ville = k === "prov" ? "" : $("#fv").value; F.st = $("#ft").value;
+  $("#fc").innerHTML = opts(catList(), F.cat, "Toutes les catégories"); $("#fv").innerHTML = opts(villeList(), F.ville, "Toutes les villes");
+  refreshHome();
+};
+A.focus = id => { const m = MK[id]; if (m && map) { $("#map").scrollIntoView({ behavior: "smooth" }); map.setView(m.getLatLng(), 13); m.openPopup(); } };
+const mkr = e => L.circleMarker([e.lat, e.lng], { radius: 8, color: "#fff", weight: 2, fillColor: status(e), fillOpacity: .95 })
+  .bindPopup(`<b>${esc(e.nom)}</b><br>${esc(e.categorie)} · ${esc(e.ville)}<br><a href="#" onclick="A.go('fiche','${e.id}');return false">Voir la fiche</a>`);
+function refreshHome() {
+  const fl = EX.filter(match), on = F.q || nF(), pts = fl.filter(e => e.lat);
+  if (map && ML) {
+    ML.clearLayers(); MK = {}; pts.forEach(e => MK[e.id] = mkr(e).addTo(ML));
+    if (on && pts.length) map.fitBounds(pts.map(e => [e.lat, e.lng]), { maxZoom: 11, padding: [30, 30] }); else if (!on) map.setView([-0.8, 11.6], 6);
+  }
+  $("#tl").innerHTML = tilesV(); $("#fb").textContent = nF() || "";
+  $("#rs").innerHTML = on ? `<div class="card"><b>${fl.length} résultat(s)</b>${fl.slice(0, 8).map(e => `<div class="row" onclick="A.focus('${e.id}')"><b>${esc(e.nom)}</b><small>${esc(e.categorie)} · ${esc(e.ville)} (${esc(e.province)}) · ${mort(e).toFixed(1)} %</small></div>`).join("")}${fl.length > 8 ? `<p class="mut">+ ${fl.length - 8} autres : affinez la recherche</p>` : ""}${fl.length ? "" : "<p class='mut'>Aucun résultat.</p>"}</div>` : "";
 }
 function initMap() {
   if (!window.L || !$("#map")) return;
   map = L.map("map", { minZoom: 5, maxBounds: [[-4.8, 8], [2.9, 15]] }).setView([-0.8, 11.6], 6);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
-  EX.filter(e => e.lat).forEach(e => L.circleMarker([e.lat, e.lng], { radius: 8, color: "#fff", weight: 2, fillColor: status(e), fillOpacity: .95 }).addTo(map)
-    .bindPopup(`<b>${esc(e.nom)}</b><br>${esc(e.categorie)} · ${esc(e.ville)}<br><a href="#" onclick="A.go('fiche','${e.id}');return false">Voir la fiche</a>`));
+  ML = L.layerGroup().addTo(map);
+  if (view === "home") refreshHome(); else EX.filter(e => e.lat).forEach(e => mkr(e).addTo(ML));
   if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => L.marker([p.coords.latitude, p.coords.longitude]).addTo(map).bindPopup("📍 Vous êtes ici"), () => {});
 }
 
