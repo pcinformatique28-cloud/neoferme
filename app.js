@@ -59,7 +59,7 @@ A.go = (v, id) => { view = v; cur = id || null; $("#drawer").classList.remove("o
 A.menu = () => {
   const items = [...TABS, ["notif", "🔔", "Notifications"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"]];
   if (isStaff()) items.splice(5, 0, ["admin", "🛠️", "Administration"]);
-  $("#drawer").innerHTML = `<div class="dp"><b>SYSTEP</b><br><small>${esc(U?.email || "")}<br>Rôle : ${esc(ROLE)}</small><hr>${items.map(i => `<a onclick="A.go('${i[0]}')">${i[1]} ${i[2]}</a>`).join("")}<a onclick="A.out()">🚪 Déconnexion</a></div><div class="dbg" onclick="A.menu()"></div>`;
+  $("#drawer").innerHTML = `<div class="dp"><b>Neoferme</b><br><small>${esc(U?.email || "")}<br>Rôle : ${esc(ROLE)}</small><hr>${items.map(i => `<a onclick="A.go('${i[0]}')">${i[1]} ${i[2]}</a>`).join("")}<a onclick="A.out()">🚪 Déconnexion</a></div><div class="dbg" onclick="A.menu()"></div>`;
   $("#drawer").classList.toggle("open");
 };
 A.user = () => U ? A.menu() : A.go("home");
@@ -77,7 +77,7 @@ function render() {
 }
 
 // ---- connexion ----
-const loginV = () => `<div class="card login"><h2>SYSTEP</h2><p class="mut">Agri-Track 241 · ${mode === "login" ? "connexion" : "créer un compte"}</p>
+const loginV = () => `<div class="card login"><h2>Neoferme</h2><p class="mut">De la ferme à l'assiette · ${mode === "login" ? "connexion" : "créer un compte"}</p>
 ${mode === "reg" ? `<label>Nom complet<input id="nom"></label><label>Je suis<select id="role"><option value="eleveur">Éleveur</option><option value="agriculteur">Agriculteur</option></select></label>` : ""}
 <label>E-mail<input id="em" type="email"></label><label>Mot de passe<input id="pw" type="password"></label>
 <button class="b g" onclick="A.auth()">${mode === "login" ? "Se connecter" : "Créer mon compte"}</button>
@@ -177,7 +177,7 @@ const nationalV = () => `<div id="map" class="map"></div><div class="card"><h3>M
 const notifV = () => `<div class="card"><h3>🔔 Alertes</h3>${alerts().map(e => `<div class="row" onclick="A.go('fiche','${e.id}')"><b>${esc(e.nom)}</b><small>Mortalité ${mort(e).toFixed(1)} % (> 5 %) · ${esc(e.ville)}</small></div>`).join("") || "<p class='mut'>Aucune alerte.</p>"}</div>`;
 const traceV = () => `<div class="card"><h3>🔎 Traçabilité</h3><label>Code de l'exploitation / lot<input id="tc"></label><button class="b g" onclick="A.go('fiche',$('#tc').value.trim())">Rechercher</button></div>`;
 const howV = () => `<div class="card"><h3>❓ Comment ça marche</h3><p>1. <b>Inscrivez</b> votre exploitation (élevage ou agriculture).<br>2. <b>Saisie</b> quotidienne : pertes, intrants, vaccins.<br>3. <b>Alertes</b> automatiques si mortalité anormale.<br>4. <b>National</b> : suivi cartographique et statistiques.<br>5. <b>Traçabilité</b> : QR code par exploitation.</p></div>`;
-const aboutV = () => `<div class="card"><h3>À propos</h3><p>SYSTEP · Agri-Track 241 · v0.3<br>Système de suivi des exploitations agricoles et d'élevage du Gabon.</p></div>`;
+const aboutV = () => `<div class="card"><h3>À propos</h3><p>Neoferme · la ferme nouvelle génération · v0.3<br>De la ferme à l'assiette : application de suivi des exploitations agricoles et d'élevage du Gabon.</p></div>`;
 
 // ---- administration : synthèses et exports ----
 function group(k) { const o = {}; EX.forEach(e => { const g = o[k(e)] ||= { n: 0, eff: 0, surf: 0, prod: 0 }; g.n++; g.eff += num(e.effectif); g.surf += num(e.surface); g.prod += num(e.production); }); return o; }
@@ -185,11 +185,11 @@ const tbl = (t, o) => { const r = Object.entries(o), s = f => r.reduce((a, [, g]
   return `<h4>${t}</h4><table><tr><th>${t.split(" ").pop()}</th><th>Expl.</th><th>Effectif</th><th>Surf. ha</th><th>Prod. kg</th></tr>${r.map(([k, g]) => `<tr><td>${esc(k)}</td><td>${g.n}</td><td>${g.eff}</td><td>${g.surf.toFixed(1)}</td><td>${g.prod}</td></tr>`).join("")}<tr class="tot"><td>TOTAL</td><td>${s("n")}</td><td>${s("eff")}</td><td>${s("surf").toFixed(1)}</td><td>${s("prod")}</td></tr></table>`; };
 function adminV() {
   return `<div class="card noprint"><h3>🛠️ Administration</h3><button class="b g" onclick="print()">🖨️ Imprimer / enregistrer en PDF</button><button class="b n" onclick="A.csv()">📄 Export CSV (Excel)</button><p class="mut">Pour un PDF : Imprimer → « Enregistrer au format PDF ».</p></div>
-<div class="card" id="print"><h3>SYSTEP — Synthèse nationale (${new Date().toLocaleDateString("fr-FR")})</h3>${tbl("Synthèse par catégorie", group(e => e.secteur + " / " + e.categorie))}${tbl("Synthèse par province", group(e => e.province))}
+<div class="card" id="print"><h3>Neoferme — Synthèse nationale (${new Date().toLocaleDateString("fr-FR")})</h3>${tbl("Synthèse par catégorie", group(e => e.secteur + " / " + e.categorie))}${tbl("Synthèse par province", group(e => e.province))}
 <h4>Fiches individuelles</h4><table><tr><th>Nom</th><th>Catégorie</th><th>Lieu</th><th>Eff.</th><th>Mort. %</th></tr>${EX.map(e => `<tr onclick="A.go('fiche','${e.id}')"><td>${esc(e.nom)}</td><td>${esc(e.categorie)}</td><td>${esc(e.ville)}</td><td>${e.effectif || ""}</td><td>${mort(e).toFixed(1)}</td></tr>`).join("")}</table></div>`;
 }
 A.csv = () => { const h = ["id", "nom", "secteur", "categorie", "province", "ville", "quartier", "village", "lat", "lng", "effectif", "surface_ha", "production_kg", "mortalite_%", "email"];
   const r = EX.map(e => [e.id, e.nom, e.secteur, e.categorie, e.province, e.ville, e.quartier, e.village, e.lat, e.lng, e.effectif, e.surface, e.production, mort(e).toFixed(1), e.email].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"));
-  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + h.join(";") + "\n" + r.join("\n")], { type: "text/csv" })); a.download = "systep-exploitations.csv"; a.click(); };
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + h.join(";") + "\n" + r.join("\n")], { type: "text/csv" })); a.download = "neoferme-exploitations.csv"; a.click(); };
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
