@@ -1,0 +1,11 @@
+// À FUSIONNER dans firestore.rules (dans match /databases/{db}/documents { ... })
+function role() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role; }
+match /exploitations/{id} {
+  allow read: if request.auth != null;
+  allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+  allow update, delete: if request.auth != null && (resource.data.uid == request.auth.uid || role() == 'admin');
+}
+match /saisies/{id} {
+  allow read: if request.auth != null && (resource.data.uid == request.auth.uid || role() in ['admin','ministere','technicien']);
+  allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+}
