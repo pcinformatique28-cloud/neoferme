@@ -11,12 +11,12 @@ const app = getApps()[0] || initializeApp(cfg || window.firebaseConfig);
 const auth = getAuth(app), db = getFirestore(app);
 
 // ---- Cloudinary (photos du forum) : renseigner le cloud name et le preset « unsigned » ----
-const CLOUD = { name: "zbof0xbh", preset: "neoferme_forum" };
+const CLOUD = { name: "VOTRE_CLOUD_NAME", preset: "VOTRE_UPLOAD_PRESET" };
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const STAFF = ["admin", "ministere", "technicien"];
-let U = null, UN = "", ROLE = "eleveur", EX = [], SA = [], view = "home", cur = null, mode = "login", map;
+let U = null, UN = "", UP = "", UPF = {}, ROLE = "eleveur", EX = [], SA = [], view = "home", cur = null, mode = "login", map;
 const A = window.A = {};
 window.$ = $;
 
@@ -53,8 +53,8 @@ async function load() {
   try { SA = (await getDocs(collection(db, "saisies"))).docs.map(d => ({ id: d.id, ...d.data() })).filter(s => isStaff() || s.uid === U.uid); } catch (e) { SA = []; }
 }
 onAuthStateChanged(auth, async u => {
-  U = u; ROLE = "eleveur"; UN = "";
-  if (u) { try { const d = await getDoc(doc(db, "users", u.uid)); ROLE = d.exists() ? (d.data().role || "eleveur") : "eleveur"; UN = d.exists() ? (d.data().nom || "") : ""; } catch (e) {} }
+  U = u; ROLE = "eleveur"; UN = ""; UP = ""; UPF = {};
+  if (u) { try { const d = await getDoc(doc(db, "users", u.uid)); ROLE = d.exists() ? (d.data().role || "eleveur") : "eleveur"; UPF = d.exists() ? d.data() : {}; UN = UPF.nom || ""; UP = UPF.photo || ""; } catch (e) {} }
   await load();
   if (u) { if (view === "login") view = "home"; if (location.hash.startsWith("#lot=")) { view = "fiche"; cur = location.hash.slice(5); } }
   else if (!["home", "forum", "how", "about"].includes(view)) view = "home";
@@ -68,28 +68,29 @@ const TABS = [["home", "🏠", "Accueil"], ["saisie", "✍️", "Saisie"], ["fer
 const tabs = () => TABS;
 A.go = (v, id) => { if (!U && !["home", "forum", "how", "about", "login"].includes(v)) v = "login"; view = v; cur = id || null; $("#drawer").classList.remove("open"); window.scrollTo(0, 0); render(); };
 A.menu = () => {
-  const items = U ? [...tabs(), ["notif", "🔔", "Notifications"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"]] : [["home", "🏠", "Accueil"], ["forum", "💬", "Forum"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"], ["login", "🔑", "Connexion"]];
+  const items = U ? [...tabs(), ["notif", "🔔", "Notifications"], ["profil", "👤", "Mon profil"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"]] : [["home", "🏠", "Accueil"], ["forum", "💬", "Forum"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"], ["login", "🔑", "Connexion"]];
   if (isStaff()) items.splice(tabs().length, 0, ["admin", "🛠️", "Administration"]);
-  $("#drawer").innerHTML = `<div class="dp"><b>Neoferme</b><br><small>${U ? esc(U.email) + "<br>Rôle : " + esc(ROLE) : "Visiteur"}</small><hr>${items.map(i => `<a onclick="A.go('${i[0]}')">${i[1]} ${i[2]}${nbHtml(i[0], "nbi")}</a>`).join("")}${U ? '<a onclick="A.out()">🚪 Déconnexion</a>' : ""}</div><div class="dbg" onclick="A.menu()"></div>`;
+  $("#drawer").innerHTML = `<div class="dp">${U ? `<div class="me" onclick="A.go('profil')">${avatarH()}<b>${esc(UN || "Mon profil")}</b><small>${esc(U.email)}<br>Rôle : ${esc(ROLE)}</small></div>` : "<b>Neoferme</b><br><small>Visiteur</small>"}<hr>${items.map(i => `<a onclick="A.go('${i[0]}')">${i[1]} ${i[2]}${nbHtml(i[0], "nbi")}</a>`).join("")}${U ? '<a onclick="A.out()">🚪 Déconnexion</a>' : ""}</div><div class="dbg" onclick="A.menu()"></div>`;
   $("#drawer").classList.toggle("open");
 };
-A.user = () => U ? A.menu() : A.go("login");
+A.user = () => A.go(U ? "profil" : "login");
 A.out = () => { signOut(auth); $("#drawer").classList.remove("open"); };
 
 function render() {
   $("#nav").innerHTML = navH();
   if (view === "notif" && U) { NEWA = unreadAlerts().map(e => e.id); markA(); }
-  updBell();
+  updBell(); setAvatar();
   $("#adm").style.display = U && isStaff() ? "flex" : "none";
   document.body.classList.remove("fsmap");
   if (map) { map.remove(); map = null; }
   const main = $("#main");
   if (!U && !["home", "forum", "how", "about"].includes(view)) view = "login";
   if (!U && view === "login") { main.innerHTML = loginV(); return; }
-  main.innerHTML = ({ home: homeV, saisie: saisieV, fermes: fermesV, national: nationalV, trace: traceV, notif: notifV, how: howV, about: aboutV, admin: adminV, fiche: ficheV, nouveau: nouveauV, forum: forumV }[view] || homeV)();
+  main.innerHTML = ({ home: homeV, saisie: saisieV, fermes: fermesV, national: nationalV, trace: traceV, notif: notifV, how: howV, about: aboutV, admin: adminV, fiche: ficheV, nouveau: nouveauV, forum: forumV, profil: profilV }[view] || homeV)();
   if (view === "home" || view === "national") initMap();
   if (view === "nouveau") { A.sect(); A.pre(); }
   if (view === "forum") A.fload();
+  if (view === "profil") A.ppre();
 }
 
 // ---- connexion ----
@@ -358,7 +359,7 @@ A.fpost = async () => {
   m.textContent = "Publication en cours…";
   try {
     const images = []; for (const f of FIMG) images.push(await upl(f));
-    await addDoc(collection(db, "forum"), { uid: U.uid, nom: who(), role: ROLE, texte: t, images, hidden: $("#fxm").checked, likes: [], nc: 0, created: serverTimestamp() });
+    await addDoc(collection(db, "forum"), { uid: U.uid, nom: who(), photo: UP || "", role: ROLE, texte: t, images, hidden: $("#fxm").checked, likes: [], nc: 0, created: serverTimestamp() });
     if (images.length) await setDoc(doc(db, "uploads", U.uid + "_" + day()), { uid: U.uid, n: (10 - FQ) + images.length });
     FIMG = []; $("#fxt").value = ""; $("#fxm").checked = false; thumbs(); m.textContent = ""; await quota(); await floadPosts();
   } catch (x) { m.textContent = x.code || x.message; }
@@ -370,7 +371,7 @@ async function floadPosts() {
 }
 const postH = p => {
   const mine = !!U && p.uid === U.uid, can = canForum() && (mine || ROLE === "admin"), lk = p.likes || [], liked = !!U && lk.includes(U.uid), im = (p.images || []).filter(okImg);
-  return `<div class="card post${p.hidden ? " hid" : ""}"><div class="ph"><b>${esc(p.nom || "Membre")}</b><small>${esc(p.role || "")} · ${ago(p.created)}${p.hidden ? " · 🙈 masqué" : ""}</small></div>
+  return `<div class="card post${p.hidden ? " hid" : ""}"><div class="ph"><div class="pw">${avs(p.photo, p.nom)}<div class="pi"><b>${esc(p.nom || "Membre")}</b><small>${esc(p.role || "")} · ${ago(p.created)}${p.hidden ? " · 🙈 masqué" : ""}</small></div></div></div>
 ${p.texte ? `<p class="pt">${esc(p.texte)}</p>` : ""}${im.length ? `<div class="pg">${im.map(u => `<img loading="lazy" alt="" src="${esc(u)}" onclick="window.open(this.src)">`).join("")}</div>` : ""}
 <div class="pa"><button onclick="A.flike('${p.id}')">${liked ? "❤️" : "🤍"} ${lk.length}</button><button onclick="A.fcm('${p.id}')">💬 ${p.nc || 0}</button>
 ${mine ? `<button onclick="A.fhide('${p.id}')">${p.hidden ? "👁️ Afficher" : "🙈 Masquer"}</button>` : ""}
@@ -390,7 +391,7 @@ A.flike = async id => {
 A.fhide = async id => { const p = FP.find(x => x.id === id); try { await updateDoc(doc(db, "forum", id), { hidden: !p.hidden }); p.hidden = !p.hidden; drawPosts(); } catch (e) { alert(e.code || e.message); } };
 A.fdel = async id => { if (!confirm("Supprimer cette publication pour tout le monde ?")) return; try { await deleteDoc(doc(db, "forum", id)); FP = FP.filter(x => x.id !== id); drawPosts(); } catch (e) { alert(e.code || e.message); } };
 A.fme = id => { try { localStorage.nfHid = JSON.stringify([...myHidden(), id]); } catch (e) {} drawPosts(); };
-const cmH = id => `${(FCM[id] || []).map(c => `<div class="cm"><b>${esc(c.nom)}</b><small>${ago(c.created)}</small><p>${esc(c.texte)}</p>${canForum() && (c.uid === U.uid || ROLE === "admin") ? `<a onclick="A.fcd('${id}','${c.id}')">Supprimer</a>` : ""}</div>`).join("") || '<p class="mut cr">Aucun commentaire.</p>'}
+const cmH = id => `${(FCM[id] || []).map(c => `<div class="cm"><div class="pw">${avs(c.photo, c.nom)}<div class="pi"><b>${esc(c.nom)}</b><small>${ago(c.created)}</small></div></div><p>${esc(c.texte)}</p>${canForum() && (c.uid === U.uid || ROLE === "admin") ? `<a onclick="A.fcd('${id}','${c.id}')">Supprimer</a>` : ""}</div>`).join("") || '<p class="mut cr">Aucun commentaire.</p>'}
 ${canForum() ? `<div class="cmf"><input id="ci-${id}" placeholder="Votre commentaire…" maxlength="500"><button class="b g" onclick="A.fcs('${id}')">Envoyer</button></div>` : `<button class="b n" onclick="A.need()">🔒 Inscrivez-vous pour commenter</button>`}`;
 async function cmLoad(id) { try { FCM[id] = (await getDocs(query(collection(db, "forum", id, "comments"), orderBy("created", "asc")))).docs.map(d => ({ id: d.id, ...d.data() })); } catch (e) { FCM[id] = []; } }
 A.fcm = async id => {
@@ -401,7 +402,7 @@ A.fcs = async id => {
   if (!canForum()) return A.need();
   const t = $("#ci-" + id).value.trim(); if (!t) return;
   try {
-    await addDoc(collection(db, "forum", id, "comments"), { uid: U.uid, nom: who(), texte: t, created: serverTimestamp() });
+    await addDoc(collection(db, "forum", id, "comments"), { uid: U.uid, nom: who(), photo: UP || "", texte: t, created: serverTimestamp() });
     await updateDoc(doc(db, "forum", id), { nc: increment(1) });
     const p = FP.find(x => x.id === id); if (p) p.nc = (p.nc || 0) + 1;
     await cmLoad(id); drawPosts();
@@ -418,5 +419,45 @@ A.fs = () => {
   setTimeout(() => map.invalidateSize(), 60);
 };
 A.pre = () => { const s = (k, v) => { const i = document.querySelector('.x[data-g="exploitant"][data-k="' + k + '"]'); if (i && v) i.value = v; }; s("email", U.email); s("nom", UN); };
+
+// ---- profil membre ----
+const PRF = [["nom", "Nom complet"], ["tel", "Téléphone", "tel"], ["whatsapp", "WhatsApp", "tel"], ["prov", "Province", Object.keys(PROVINCES)], ["ville", "Ville / village"],
+  ["profil", "Profil", ["Éleveur", "Agriculteur", "Agro-éleveur (mixte)", "Pisciculteur", "Apiculteur", "Transformateur", "Autre"]], ["bio", "Biographie", "textarea"]];
+const initial = n => esc(((n || (U && U.email) || "M").trim()[0] || "M").toUpperCase());
+const avatarH = () => okImg(UP) ? `<img class="av" src="${esc(UP)}" alt="Photo de profil">` : `<span class="av">${initial(UN)}</span>`;
+const avs = (u, n) => okImg(u) ? `<img class="av s" loading="lazy" src="${esc(u)}" alt="">` : `<span class="av s">${initial(n)}</span>`;
+const setAvatar = () => { const b = $("#usr"); if (b) b.innerHTML = U && okImg(UP) ? `<img src="${esc(UP)}" alt="Profil">` : "👤"; };
+const profilV = () => `<div class="card"><h3>👤 Mon profil</h3>
+<div class="pav" onclick="$('#pfile').click()">${avatarH()}<span class="cam">📷</span></div>
+<input id="pfile" type="file" accept="image/*" hidden onchange="A.pphoto(this)">
+<button class="b n" onclick="$('#pfile').click()">📷 ${okImg(UP) ? "Changer" : "Ajouter"} ma photo</button>${okImg(UP) ? `<button class="b n" onclick="A.prm()">🗑️ Retirer ma photo</button>` : ""}
+<p class="mut">${esc(U.email)} · Rôle : <b>${esc(ROLE)}</b></p><p id="pmsg" class="err"></p></div>
+${blk("Mes informations", "prof", PRF)}
+<button class="b g" onclick="A.psave()">Enregistrer mon profil</button><p id="msg" class="err"></p>`;
+A.ppre = () => document.querySelectorAll('.x[data-g="prof"]').forEach(i => { i.value = UPF[i.dataset.k] || ""; });
+const sq = (f, n = 400) => new Promise(res => {
+  const im = new Image(), u = URL.createObjectURL(f);
+  im.onload = () => { const s = Math.min(im.width, im.height), c = document.createElement("canvas"); c.width = c.height = n; c.getContext("2d").drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, n, n); URL.revokeObjectURL(u); c.toBlob(b => res(b), "image/jpeg", .85); };
+  im.onerror = () => res(null); im.src = u;
+});
+A.pphoto = async inp => {
+  const f = inp.files[0], m = $("#pmsg"); inp.value = ""; if (!f || !f.type.startsWith("image/")) return;
+  if (CLOUD.name.startsWith("VOTRE")) { m.textContent = "Cloudinary n'est pas configuré."; return; }
+  m.textContent = "Envoi de la photo…";
+  try {
+    const b = await sq(f); if (!b) throw new Error("Image illisible");
+    const fd = new FormData(); fd.append("file", b); fd.append("upload_preset", CLOUD.preset);
+    const j = await (await fetch(`https://api.cloudinary.com/v1_1/${CLOUD.name}/image/upload`, { method: "POST", body: fd })).json();
+    if (!j.secure_url) throw new Error((j.error && j.error.message) || "Échec de l'envoi");
+    await setDoc(doc(db, "users", U.uid), { photo: j.secure_url }, { merge: true });
+    UP = j.secure_url; UPF.photo = UP; setAvatar(); const p = $(".pav"); if (p) p.innerHTML = avatarH() + '<span class="cam">📷</span>'; m.textContent = "✅ Photo mise à jour.";
+  } catch (x) { m.textContent = x.code || x.message; }
+};
+A.prm = async () => { try { await setDoc(doc(db, "users", U.uid), { photo: "" }, { merge: true }); UP = ""; UPF.photo = ""; render(); } catch (x) { $("#pmsg").textContent = x.code || x.message; } };
+A.psave = async () => {
+  const o = {}, m = $("#msg"); document.querySelectorAll('.x[data-g="prof"]').forEach(i => { o[i.dataset.k] = i.value.trim(); });
+  try { await setDoc(doc(db, "users", U.uid), o, { merge: true }); UPF = { ...UPF, ...o }; UN = o.nom || ""; m.style.color = "#1a7f37"; m.textContent = "✅ Profil enregistré."; }
+  catch (x) { m.style.color = ""; m.textContent = x.code || x.message; }
+};
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");

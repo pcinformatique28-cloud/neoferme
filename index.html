@@ -67,6 +67,13 @@ input[type=checkbox]{display:inline-block;width:auto;margin:0;transform:scale(1.
 .chk{display:flex;align-items:center;justify-content:center;gap:10px;font-size:13px;font-weight:600;margin:10px 0;text-align:center}
 nav a{position:relative}.nb{position:absolute;top:3px;left:calc(50% + 4px);min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#e33;color:#fff;font-size:11px;font-style:normal;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;border:2px solid #fff}
 .nbi{margin-left:auto;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#e33;color:#fff;font-size:12px;font-style:normal;font-weight:700;display:flex;align-items:center;justify-content:center}
+#usr img{width:36px;height:36px;padding:0;border-radius:50%;object-fit:cover;border:2px solid #fcd116;display:block;margin:0}
+.av{width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #fcd116;display:flex;align-items:center;justify-content:center;background:#0b1f4d;color:#fff;font-weight:700;font-size:26px;margin:0}
+.av.s{width:38px;height:38px;border-width:2px;font-size:16px;flex:none}
+.me{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0 0}.me .av{width:76px;height:76px;font-size:30px}.me small{color:#556;line-height:1.4}
+.pav{position:relative;width:120px;height:120px;margin:0 auto 12px}.pav .av{width:120px;height:120px;font-size:48px}
+.cam{position:absolute;right:-2px;bottom:-2px;background:#fff;border:2px solid #d6dff0;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.pw{display:flex;gap:10px;align-items:center}.pi{display:flex;flex-direction:column;text-align:left}.pi small{margin:0}
 /* carte plein écran */
 .fsb{background:#fff;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:20px;border-radius:4px;border:2px solid rgba(0,0,0,.25);text-decoration:none;color:#0b1f4d;font-weight:700}
 .mapfs{position:fixed!important;inset:0!important;height:100%!important;width:100%!important;min-height:0!important;border-radius:0!important;margin:0!important}
@@ -105,6 +112,6 @@ body.fsmap main{z-index:2500}body.fsmap{overflow:hidden}
 if(seen){sp.remove();return}
 setTimeout(function(){var b=document.getElementById("animbox");if(!b)return;b.appendChild(document.getElementById("tp").content.cloneNode(true));document.getElementById("intro").className="off"},2400);
 setTimeout(function(){sp.className="fin"},7800);setTimeout(function(){sp.remove()},8600)})()</script>
-<header><button onclick="A.menu()">☰</button><img src="assets/icone-192.png" alt=""><b>Neoferme</b><button id="adm" style="display:none" onclick="A.go('admin')" title="Administration">🛠️</button><button onclick="A.go('notif')">🔔<i id="badge"></i></button><button onclick="A.user()">👤</button></header>
+<header><button onclick="A.menu()">☰</button><img src="assets/icone-192.png" alt=""><b>Neoferme</b><button id="adm" style="display:none" onclick="A.go('admin')" title="Administration">🛠️</button><button onclick="A.go('notif')">🔔<i id="badge"></i></button><button id="usr" onclick="A.user()">👤</button></header>
 <main id="main"></main><nav id="nav"></nav><div id="drawer"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script type="module" src="app.js"></script></body></html>
