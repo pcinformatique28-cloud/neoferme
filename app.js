@@ -99,7 +99,7 @@ function render() {
 // ---- connexion ----
 const loginV = () => `<div class="card login"><h2>Neoferme</h2><p class="mut">De la ferme à l'assiette · ${mode === "login" ? "connexion" : "créer un compte"}</p>
 ${mode === "reg" ? `<label>Nom complet<input id="nom"></label><label>Je suis<select id="role"><option value="eleveur">Éleveur</option><option value="agriculteur">Agriculteur</option></select></label>` : ""}
-<label>E-mail<input id="em" type="email"></label><label>Mot de passe<input id="pw" type="password"></label>
+<label>E-mail<input id="em" type="email"></label><label>Mot de passe<span class="pw-wrap"><input id="pw" type="password"><button type="button" class="pw-eye" onclick="A.eye(this)" aria-label="Afficher le mot de passe">👁️</button></span></label>
 <button class="b g" onclick="A.auth()">${mode === "login" ? "Se connecter" : "Créer mon compte"}</button>
 <button class="b n" onclick="mode='${mode === "login" ? "reg" : "login"}';A.go('login')">${mode === "login" ? "Créer un compte" : "Retour à la connexion"}</button>
 <a class="lk" onclick="A.reset()">Mot de passe oublié ?</a><a class="lk" onclick="A.go('home')">← Retour à l'accueil</a><p id="msg" class="err"></p><p class="mut cr">Une réalisation PC-INFORMATIQUE · 11<sup>e</sup> application du studio</p></div>`;
@@ -633,3 +633,7 @@ window.addEventListener("appinstalled", () => A.epx("ins", 1));
 setTimeout(() => { EPH_ON = true; ephAdd("how"); ephAdd("ins"); }, document.getElementById("splash") ? 9200 : 1800);
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+
+/* Oeil afficher/masquer mot de passe */
+A.eye = (b) => { const i = b.previousElementSibling, s = i.type === "password"; i.type = s ? "text" : "password"; b.textContent = s ? "🙈" : "👁️"; b.setAttribute("aria-label", s ? "Masquer le mot de passe" : "Afficher le mot de passe"); };
+(() => { const st = document.createElement("style"); st.textContent = ".pw-wrap{position:relative;display:block}.pw-wrap input{padding-right:52px!important;width:100%;box-sizing:border-box}.pw-eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:0;font-size:22px;line-height:1;padding:6px;cursor:pointer;width:auto;margin:0;box-shadow:none}"; document.head.appendChild(st); })();
