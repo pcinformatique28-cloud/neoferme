@@ -664,3 +664,88 @@ Object.assign(SEC["Agriculture"], {
   "Bananeraies": [["cultures", "Cultures", ["Banane plantain", "Banane douce", "Mixte"]], ["pieds", "Nb de pieds", "number"], ["age", "Âge des plantations (ans)", "number"], ["associe", "Culture associée", ["Aucune", "Manioc", "Arachide", "Taro", "Maïs"]]],
   "Ananeraies": [["cultures", "Variété", ["Cayenne lisse", "Pain de sucre", "MD2", "Locale"]], ["pieds", "Nb de plants", "number"], ["age", "Âge des plantations (mois)", "number"], ["irrigation", "Irrigation", ["Pluviale", "Arrosage", "Goutte-à-goutte"]]]
 });
+
+/* Accueil : tuiles agricole / élevage + statistiques cultures */
+(() => {
+  const fr = n => (+n || 0).toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+  const sm = (a, k) => a.reduce((s, e) => s + num(e[k]), 0);
+  const tl = (ic, n, l, js) => `<div class="tile" onclick="${js}"><span>${ic}</span><b>${n}</b><small>${l}</small></div>`;
+  A.fsec = s => { F.sec = F.sec === s ? "" : s; F.cat = ""; A.go(U ? "fermes" : "home"); };
+  tilesV = function () {
+    const fl0 = EX.filter(match), ag = fl0.filter(e => e.secteur === "Agriculture"), el = fl0.filter(e => e.secteur === "Élevage");
+    if (!U) {
+      const n = k => new Set(fl0.map(e => e[k])).size;
+      return tl("🌾", ag.length, "Exploitations agricoles", "A.fsec('Agriculture')") + tl("🐔", el.length, "Fermes d'élevage", "A.fsec('Élevage')") + tl("🐄", fr(sm(el, "effectif")), "Effectif animal total", "A.go('home')") + tl("🌱", fr(sm(ag, "surface")), "Surface cultivée (ha)", "A.go('home')") + tl("🗺️", n("province"), "Provinces couvertes", "A.go('home')") + tl("🏷️", n("categorie"), "Catégories", "A.go('home')") + tl("🔑", "→", "Se connecter", "A.go('login')") + tl("➕", "+", "Inscrire mon exploitation", "A.go('login')");
+    }
+    const mine = isStaff() ? fl0 : fl0.filter(e => e.uid === U.uid), mA = mine.filter(e => e.secteur === "Agriculture"), mE = mine.filter(e => e.secteur === "Élevage");
+    const mm = mE.length ? (mE.reduce((a, e) => a + mort(e), 0) / mE.length).toFixed(1) : "0.0", ha = sm(mA, "surface"), kg = sm(mA, "production");
+    return tl("🌾", mA.length, isStaff() ? "Exploitations agricoles" : "Mes exploitations agricoles", "A.fsec('Agriculture')") + tl("🐔", mE.length, isStaff() ? "Fermes d'élevage" : "Mes fermes d'élevage", "A.fsec('Élevage')") + tl("🐄", fr(sm(mE, "effectif")), "Effectif animal total", "A.go('fermes')") + tl("📉", mm + " %", "Mortalité moyenne (élevage)", "A.go('national')") + tl("🌱", fr(ha), "Surface cultivée (ha)", "A.go('fermes')") + tl("📦", fr(kg / 1000), "Production agricole (t/an)", "A.go('national')") + tl("⚖️", ha ? fr(kg / 1000 / ha) : "0", "Rendement moyen (t/ha)", "A.go('national')")
+      + tl("🚨", mine.filter(e => mort(e) > 5).length, "Alertes actives", "A.go('notif')") + tl("✍️", SA.length, "Saisies", "A.go('saisie')") + tl("➕", "+", "Ajouter une exploitation", "A.go('nouveau')");
+  };
+  const r0 = render;
+  render = function () {
+    const x = r0.apply(this, arguments);
+    try {
+      const e = view === "fiche" ? EX.find(z => z.id === cur) : null;
+      if (e && e.secteur === "Agriculture" && num(e.surface) && !document.getElementById("stat-agri")) {
+        const kv = (k, v) => `<div class="kv"><small>${k}</small><b>${v}</b></div>`, t = num(e.production) / 1000, d = e.details || {}, np = num(d.pieds || d.arbres), s = num(e.surface);
+        const html = `<div class="blk" id="stat-agri"><h4>📊 Statistiques de production</h4>${kv("Production annuelle", fr(t) + " t")}${kv("Rendement", fr(t / s) + " t/ha")}${np ? kv("Densité", fr(np / s) + " pieds/ha") + kv("Production par pied", fr(num(e.production) / np) + " kg") : ""}${kv("Surface cultivée", fr(s) + " ha")}</div>`;
+        const p = [...document.querySelectorAll("#print p")].find(q => /Mortalité :/.test(q.textContent));
+        if (p) p.insertAdjacentHTML("afterend", html);
+      }
+    } catch (_) {}
+    return x;
+  };
+})();
+
+/* Démo : 8 exploitations de cultures */
+DEMO.push(
+  { id: "d12", nom: "Oignonnière du Plateau Batéké", sec: "Agriculture", cat: "Oignons & Aromates", prov: "Haut-Ogooué", ville: "Léconi", q: "", vil: "Kessa", eff: 0, surf: 1.5, prod: 18000, morts: [0, 0], aliment: 60,
+    det: { cultures: "Oignon", variete: "Violet de Galmi", irrigation: "Arrosage", cycle: "110" },
+    ex: dx("MBOUMBA", "Rodrigue", "Homme", "1980-02-19", "Agriculteur", "Technique / professionnel", 10, "12", "Haut-Ogooué", "Léconi", "", "Village Kessa, route de Léconi", "Rodrigue cultive l'oignon sur les sols sableux du plateau Batéké depuis dix ans et vend sa récolte séchée aux marchés de Franceville et de Moanda."),
+    zone: dz("Zone de culture", "Terre coutumière / familiale", "GIE / groupement", "GIE Oignons du Plateau", 9, "Piste", 38, "Culture en planches surélevées"),
+    clim: dc("Tropical de savane", 1700, 25, "Sableux", "Rivière / cours d'eau", "Sols pauvres et manque d'eau en saison sèche"),
+    chr: dh("Mai", "Octobre", 4, 2, "Pépinière de cinq semaines, repiquage, récolte puis séchage de trois semaines.", "Deux cycles : petite saison sèche et grande saison sèche.", "Séchage à l'ombre pour la conservation, vente groupée par le GIE.") },
+  { id: "d13", nom: "Tomates sous Serre de Ntoum", sec: "Agriculture", cat: "Tomates & Piments", prov: "Estuaire", ville: "Ntoum", q: "", vil: "Mvoum", eff: 0, surf: 1.2, prod: 30000, morts: [0, 0], aliment: 90,
+    det: { cultures: "Tomate", variete: "Roma", abri: "Sous tunnel / serre", irrigation: "Goutte-à-goutte" },
+    ex: dx("NDONG ESSONO", "Carine", "Femme", "1991-07-08", "Agriculteur", "Supérieur", 6, "13", "Estuaire", "Ntoum", "", "Village Mvoum, route de Ntoum", "Ingénieure agronome de formation, Carine produit des tomates sous tunnel pour les supermarchés et restaurants de Libreville toute l'année."),
+    zone: dz("Zone de culture", "Propriété privée / titre foncier", "Exploitant indépendant", "", 6, "Route bitumée", 35, "Bonnes pratiques agricoles"),
+    clim: dc("Équatorial humide", 2400, 27, "Latéritique", "Forage / puits", "Flétrissement bactérien et forte humidité"),
+    chr: dh("Janvier", "Décembre", 5, 2, "Pépinière de quatre semaines, plantation sous tunnel, tuteurage, récoltes étalées sur trois mois.", "Deux cultures par an, la plus productive en saison sèche.", "Rotation avec le concombre pour limiter les maladies du sol.") },
+  { id: "d14", nom: "Piments de Koulamoutou", sec: "Agriculture", cat: "Tomates & Piments", prov: "Ogooué-Lolo", ville: "Koulamoutou", q: "", vil: "Bemba", eff: 0, surf: 0.8, prod: 4800, morts: [0, 0], aliment: 25,
+    det: { cultures: "Piment", variete: "Piment oiseau", abri: "Plein champ", irrigation: "Pluviale" },
+    ex: dx("MOUELE", "Jean-Pierre", "Homme", "1975-11-23", "Agriculteur", "Secondaire", 15, "14", "Ogooué-Lolo", "Koulamoutou", "", "Village Bemba, après le pont", "Jean-Pierre produit du piment frais et séché qu'il vend sur les marchés de Koulamoutou et envoie par camion vers Libreville."),
+    zone: dz("Zone de culture", "Terre coutumière / familiale", "Coopérative", "Coopérative des Producteurs de Piment", 15, "Piste", 14, ""),
+    clim: dc("Équatorial humide", 1900, 26, "Latéritique", "Eau de pluie", "Pluies abondantes et pourriture des fruits"),
+    chr: dh("Février", "Novembre", 5, 2, "Pépinière, repiquage, récoltes échelonnées sur deux mois, séchage au soleil.", "Deux plantations : début de grande saison des pluies et petite saison.", "Le piment séché se conserve et se vend toute l'année.") },
+  { id: "d15", nom: "Bananeraie Plantain de Fougamou", sec: "Agriculture", cat: "Bananeraies", prov: "Ngounié", ville: "Fougamou", q: "", vil: "Doubou", eff: 0, surf: 6, prod: 36000, morts: [0, 0], aliment: 40,
+    det: { cultures: "Banane plantain", pieds: "7200", age: "4", associe: "Manioc" },
+    ex: dx("MAGANGA", "Sidonie", "Femme", "1968-09-14", "Agriculteur", "Primaire", 28, "15", "Ngounié", "Fougamou", "", "Village Doubou", "Sidonie entretient une grande bananeraie plantain associée au manioc et fournit les marchés de Mouila et de Lambaréné."),
+    zone: dz("Zone de culture", "Terre coutumière / familiale", "Coopérative", "Coopérative des Planteurs de Fougamou", 28, "Piste", 22, ""),
+    clim: dc("Équatorial humide", 2100, 26, "Latéritique", "Eau de pluie", "Vents violents et charançon du bananier"),
+    chr: dh("Janvier", "Décembre", 12, 1, "Plantation de rejets, entretien, récolte des régimes tout au long de l'année.", "Plantation en début de grande saison des pluies.", "Rejets sélectionnés, renouvellement d'un cinquième de la parcelle chaque année.") },
+  { id: "d16", nom: "Ananeraie de Ndjolé", sec: "Agriculture", cat: "Ananeraies", prov: "Moyen-Ogooué", ville: "Ndjolé", q: "", vil: "Mbéga", eff: 0, surf: 3, prod: 60000, morts: [0, 0], aliment: 50,
+    det: { cultures: "Cayenne lisse", pieds: "90000", age: "18", irrigation: "Pluviale" },
+    ex: dx("BOUSSOUGOU", "Aimé", "Homme", "1983-04-05", "Agriculteur", "Secondaire", 11, "16", "Moyen-Ogooué", "Ndjolé", "", "Village Mbéga, route de Lambaréné", "Aimé produit de l'ananas Cayenne lisse destiné aux marchés de Lambaréné et de Libreville, sur d'anciennes parcelles de savane."),
+    zone: dz("Zone de culture", "Propriété privée / titre foncier", "Exploitant indépendant", "", 11, "Route bitumée", 45, ""),
+    clim: dc("Équatorial humide", 1900, 26, "Sableux", "Eau de pluie", "Cochenilles et floraison irrégulière"),
+    chr: dh("Mars", "Février", 18, 1, "Plantation des rejets, entretien, induction florale, récolte étalée sur deux mois.", "Plantation en début de saison des pluies.", "Cycle de dix-huit mois, parcelles décalées pour récolter chaque saison.") },
+  { id: "d17", nom: "Verger de Papayes de Booué", sec: "Agriculture", cat: "Fruitier", prov: "Ogooué-Ivindo", ville: "Booué", q: "", vil: "", eff: 0, surf: 2, prod: 54000, morts: [0, 0], aliment: 30,
+    det: { cultures: "Papaye", arbres: "3600" },
+    ex: dx("NGUEMA OBAME", "Léonce", "Homme", "1978-12-01", "Agriculteur", "Secondaire", 13, "17", "Ogooué-Ivindo", "Booué", "", "Quartier de la gare, Booué", "Léonce cultive la papaye et vend ses fruits aux voyageurs et aux commerçants de l'axe Booué-Libreville."),
+    zone: dz("Zone de culture", "Terre coutumière / familiale", "Exploitant indépendant", "", 13, "Piste", 6, ""),
+    clim: dc("Équatorial humide", 1700, 26, "Latéritique", "Eau de pluie", "Virus de la papaye et vent"),
+    chr: dh("Janvier", "Décembre", 12, 1, "Plantation, entretien, récolte continue à partir du neuvième mois.", "Plantation en début de saison des pluies.", "Renouvellement des plants tous les trois ans.") },
+  { id: "d18", nom: "Jardins Hors-Sol d'Angondjé", sec: "Agriculture", cat: "Tomates & Piments", prov: "Estuaire", ville: "Akanda", q: "Angondjé", vil: "", eff: 0, surf: 0.6, prod: 9000, morts: [0, 0], aliment: 45,
+    det: { cultures: "Mixte", variete: "Locale", abri: "Hors-sol", irrigation: "Goutte-à-goutte" },
+    ex: dx("ELLA ENGONE", "Estelle", "Femme", "1989-10-27", "Agriculteur", "Technique / professionnel", 7, "18", "Estuaire", "Akanda", "Angondjé", "Zone maraîchère d'Angondjé", "Estelle cultive poivrons, aubergines et piments en sacs hors-sol sur un terrain périurbain et livre des paniers à des familles de Libreville."),
+    zone: dz("Zone urbaine / périurbaine", "Location / bail", "Exploitant indépendant", "", 7, "Route bitumée", 8, "Production sans pesticide de synthèse"),
+    clim: dc("Équatorial humide", 2500, 27, "Latéritique", "Réseau SEEG", "Coût de l'eau et ravageurs"),
+    chr: dh("Janvier", "Décembre", 3, 4, "Semis en pépinière, repiquage en sacs, récolte et livraison hebdomadaire.", "Quatre cycles par an.", "Substrat renouvelé à chaque cycle avec du compost.") },
+  { id: "d19", nom: "Bananes Douces de Banio", sec: "Agriculture", cat: "Bananeraies", prov: "Nyanga", ville: "Mayumba", q: "", vil: "Banio", eff: 0, surf: 4, prod: 28000, morts: [0, 0], aliment: 35,
+    det: { cultures: "Banane douce", pieds: "4800", age: "3", associe: "Aucune" },
+    ex: dx("MOMBO", "Gisèle", "Femme", "1972-05-30", "Agriculteur", "Primaire", 20, "19", "Nyanga", "Mayumba", "", "Village Banio, bord de lagune", "Gisèle produit des bananes douces pour les marchés de Mayumba et de Tchibanga et pour un groupement de femmes qui fabrique des chips."),
+    zone: dz("Zone de culture", "Terre coutumière / familiale", "GIE / groupement", "GIE Femmes de Banio", 20, "Piste", 18, ""),
+    clim: dc("Littoral océanique", 2300, 26, "Sableux", "Eau de pluie", "Embruns salés et sols sableux pauvres"),
+    chr: dh("Janvier", "Décembre", 10, 1, "Plantation de rejets, entretien, récolte des régimes toute l'année.", "Plantation en début de saison des pluies.", "Paillage avec les feuilles sèches pour garder l'humidité du sol.") }
+);
