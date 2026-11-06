@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, collection, getDocs, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, collection, getDocs, deleteDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, query, orderBy, limit, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { PROVINCES } from "./gabon.js";
 
 // ---- config Firebase : réutilise firebase-config.js existant ----
@@ -10,10 +10,13 @@ if (!cfg && !getApps().length) { try { const t = await (await fetch("firebase-co
 const app = getApps()[0] || initializeApp(cfg || window.firebaseConfig);
 const auth = getAuth(app), db = getFirestore(app);
 
+// ---- Cloudinary (photos du forum) : renseigner le cloud name et le preset « unsigned » ----
+const CLOUD = { name: "VOTRE_CLOUD_NAME", preset: "VOTRE_UPLOAD_PRESET" };
+
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const STAFF = ["admin", "ministere", "technicien"];
-let U = null, ROLE = "eleveur", EX = [], SA = [], view = "home", cur = null, mode = "login", map;
+let U = null, UN = "", ROLE = "eleveur", EX = [], SA = [], view = "home", cur = null, mode = "login", map;
 const A = window.A = {};
 window.$ = $;
 
@@ -49,8 +52,8 @@ async function load() {
   try { SA = (await getDocs(collection(db, "saisies"))).docs.map(d => ({ id: d.id, ...d.data() })).filter(s => isStaff() || s.uid === U.uid); } catch (e) { SA = []; }
 }
 onAuthStateChanged(auth, async u => {
-  U = u; ROLE = "eleveur";
-  if (u) { try { const d = await getDoc(doc(db, "users", u.uid)); ROLE = d.exists() ? (d.data().role || "eleveur") : "eleveur"; } catch (e) {} }
+  U = u; ROLE = "eleveur"; UN = "";
+  if (u) { try { const d = await getDoc(doc(db, "users", u.uid)); ROLE = d.exists() ? (d.data().role || "eleveur") : "eleveur"; UN = d.exists() ? (d.data().nom || "") : ""; } catch (e) {} }
   await load();
   if (u) { if (view === "login") view = "home"; if (location.hash.startsWith("#lot=")) { view = "fiche"; cur = location.hash.slice(5); } }
   else if (!["home", "how", "about"].includes(view)) view = "home";
@@ -58,12 +61,14 @@ onAuthStateChanged(auth, async u => {
 });
 
 // ---- navigation ----
+const canForum = () => ["admin", "eleveur", "agriculteur"].includes(ROLE);
 const PUB = [["home", "🏠", "Accueil"], ["how", "❓", "Aide"], ["about", "ℹ️", "À propos"], ["login", "🔑", "Connexion"]];
-const TABS = [["home", "🏠", "Accueil"], ["saisie", "✍️", "Saisie"], ["fermes", "🌾", "Exploitations"], ["national", "📊", "National"], ["trace", "🔎", "Traçabilité"]];
-A.go = (v, id) => { if (!U && !["home", "how", "about", "login"].includes(v)) v = "login"; view = v; cur = id || null; $("#drawer").classList.remove("open"); window.scrollTo(0, 0); render(); };
+const TABS = [["home", "🏠", "Accueil"], ["saisie", "✍️", "Saisie"], ["fermes", "🌾", "Exploitations"], ["national", "📊", "National"], ["trace", "🔎", "Traçabilité"], ["forum", "💬", "Forum"]];
+const tabs = () => TABS.filter(t => t[0] !== "forum" || canForum());
+A.go = (v, id) => { if (v === "forum" && !canForum()) v = "home"; if (!U && !["home", "how", "about", "login"].includes(v)) v = "login"; view = v; cur = id || null; $("#drawer").classList.remove("open"); window.scrollTo(0, 0); render(); };
 A.menu = () => {
-  const items = U ? [...TABS, ["notif", "🔔", "Notifications"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"]] : [["home", "🏠", "Accueil"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"], ["login", "🔑", "Connexion"]];
-  if (isStaff()) items.splice(5, 0, ["admin", "🛠️", "Administration"]);
+  const items = U ? [...tabs(), ["notif", "🔔", "Notifications"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"]] : [["home", "🏠", "Accueil"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"], ["login", "🔑", "Connexion"]];
+  if (isStaff()) items.splice(tabs().length, 0, ["admin", "🛠️", "Administration"]);
   $("#drawer").innerHTML = `<div class="dp"><b>Neoferme</b><br><small>${U ? esc(U.email) + "<br>Rôle : " + esc(ROLE) : "Visiteur"}</small><hr>${items.map(i => `<a onclick="A.go('${i[0]}')">${i[1]} ${i[2]}</a>`).join("")}${U ? '<a onclick="A.out()">🚪 Déconnexion</a>' : ""}</div><div class="dbg" onclick="A.menu()"></div>`;
   $("#drawer").classList.toggle("open");
 };
@@ -71,15 +76,19 @@ A.user = () => U ? A.menu() : A.go("login");
 A.out = () => { signOut(auth); $("#drawer").classList.remove("open"); };
 
 function render() {
-  $("#nav").innerHTML = (U ? TABS : PUB).map(t => `<a class="${view === t[0] ? "on" : ""}" onclick="A.go('${t[0]}')"><span>${t[1]}</span>${t[2]}</a>`).join("");
+  $("#nav").innerHTML = (U ? tabs() : PUB).map(t => `<a class="${view === t[0] ? "on" : ""}" onclick="A.go('${t[0]}')"><span>${t[1]}</span>${t[2]}</a>`).join("");
   $("#badge").style.display = alerts().length ? "block" : "none";
+  $("#adm").style.display = U && isStaff() ? "flex" : "none";
+  document.body.classList.remove("fsmap");
   if (map) { map.remove(); map = null; }
   const main = $("#main");
   if (!U && !["home", "how", "about"].includes(view)) view = "login";
+  if (view === "forum" && !canForum()) view = "home";
   if (!U && view === "login") { main.innerHTML = loginV(); return; }
-  main.innerHTML = ({ home: homeV, saisie: saisieV, fermes: fermesV, national: nationalV, trace: traceV, notif: notifV, how: howV, about: aboutV, admin: adminV, fiche: ficheV, nouveau: nouveauV }[view] || homeV)();
+  main.innerHTML = ({ home: homeV, saisie: saisieV, fermes: fermesV, national: nationalV, trace: traceV, notif: notifV, how: howV, about: aboutV, admin: adminV, fiche: ficheV, nouveau: nouveauV, forum: forumV }[view] || homeV)();
   if (view === "home" || view === "national") initMap();
-  if (view === "nouveau") A.sect();
+  if (view === "nouveau") { A.sect(); A.pre(); }
+  if (view === "forum") A.fload();
 }
 
 // ---- connexion ----
@@ -159,6 +168,7 @@ function initMap() {
   map = L.map("map", { minZoom: 5, maxBounds: [[-4.8, 8], [2.9, 15]] }).setView([-0.8, 11.6], 6);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
   ML = L.layerGroup().addTo(map);
+  new (L.Control.extend({ onAdd() { const b = L.DomUtil.create("a", "fsb"); b.href = "#"; b.title = "Plein écran"; b.textContent = "⛶"; L.DomEvent.disableClickPropagation(b); L.DomEvent.on(b, "click", ev => { L.DomEvent.preventDefault(ev); A.fs(); }); return b; } }))({ position: "topleft" }).addTo(map);
   if (view === "home") refreshHome(); else EX.filter(e => e.lat).forEach(e => mkr(e).addTo(ML));
   if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => L.marker([p.coords.latitude, p.coords.longitude]).addTo(map).bindPopup("📍 Vous êtes ici"), () => {});
 }
@@ -167,20 +177,52 @@ function initMap() {
 const fermesV = () => { const l = isStaff() ? EX : EX.filter(e => e.uid === U.uid);
   return `<div class="card"><h3>${isStaff() ? "Toutes les exploitations" : "Mes exploitations"}</h3><button class="b g" onclick="A.go('nouveau')">➕ Ajouter une exploitation</button>
 ${l.map(e => `<div class="row" onclick="A.go('fiche','${e.id}')"><b>${esc(e.nom)}</b><small>${esc(e.secteur)} · ${esc(e.categorie)} · ${esc(e.ville)} (${esc(e.province)})</small></div>`).join("") || "<p class='mut'>Aucune exploitation enregistrée.</p>"}</div>`; };
+// ---- formulaires enrichis ----
+const MOIS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+const FEX = [["nom", "Nom"], ["prenom", "Prénom(s)"], ["sexe", "Sexe", ["Homme", "Femme"]], ["naissance", "Date de naissance", "date"], ["nationalite", "Nationalité"],
+  ["profil", "Profil", ["Éleveur", "Agriculteur", "Agro-éleveur (mixte)", "Pisciculteur", "Apiculteur", "Transformateur", "Exploitant forestier", "Autre"]],
+  ["niveau", "Niveau d'études", ["Aucun", "Primaire", "Secondaire", "Technique / professionnel", "Supérieur"]], ["experience", "Années d'expérience", "number"],
+  ["tel", "Téléphone", "tel"], ["whatsapp", "WhatsApp", "tel"], ["email", "E-mail", "email"],
+  ["rprov", "Province de résidence", Object.keys(PROVINCES)], ["rville", "Ville / commune de résidence"], ["rquartier", "Quartier / village de résidence"], ["adresse", "Adresse / point de repère"],
+  ["bio", "Biographie / parcours", "textarea"]];
+const FZO = [["type", "Type de zone", ["Zone de culture", "Zone d'élevage", "Forêt vierge (primaire)", "Forêt secondaire", "Zone urbaine / périurbaine", "Concession forestière", "Zone humide / mangrove", "Savane / prairie", "Zone mixte"]],
+  ["foncier", "Statut foncier", ["Propriété privée / titre foncier", "Terre coutumière / familiale", "Location / bail", "Concession", "Domaine de l'État", "Autre"]],
+  ["organisation", "Organisation", ["Exploitant indépendant", "Coopérative", "GIE / groupement", "Association", "Entreprise", "Concession forestière"]],
+  ["coop", "Nom de la coopérative / du groupement / de la concession"], ["membres", "Nombre de membres / employés", "number"],
+  ["acces", "Accès à l'exploitation", ["Route bitumée", "Piste", "Fleuve / pirogue", "Accès difficile"]], ["dist", "Distance au marché le plus proche (km)", "number"], ["certif", "Labels / certifications"]];
+const FCL = [["climat", "Climat local", ["Équatorial humide", "Équatorial de transition", "Tropical de savane", "Littoral océanique"]],
+  ["saison", "Saison en cours", ["Grande saison des pluies", "Grande saison sèche", "Petite saison des pluies", "Petite saison sèche"]],
+  ["pluvio", "Pluviométrie annuelle (mm)", "number"], ["temp", "Température moyenne (°C)", "number"],
+  ["sol", "Type de sol", ["Argileux", "Sableux", "Limoneux", "Latéritique", "Hydromorphe", "Autre"]],
+  ["eau", "Source d'eau principale", ["Pluie", "Rivière / fleuve", "Forage / puits", "Réseau SEEG", "Étang / bassin"]],
+  ["risques", "Risques climatiques / sanitaires observés", "textarea"]];
+const FCH = [["debut", "Début du cycle", MOIS], ["fin", "Fin du cycle", MOIS], ["duree", "Durée d'un cycle (mois)", "number"], ["cycles", "Nombre de cycles par an", "number"],
+  ["mensuel", "Chronologie mensuelle (activités mois par mois)", "textarea"], ["trimestriel", "Chronologie trimestrielle (T1 à T4)", "textarea"], ["annuel", "Chronologie annuelle (plan de l'année)", "textarea"]];
+const fx = g => ([k, l, t]) => Array.isArray(t)
+  ? `<label>${l}<select class="x" data-g="${g}" data-k="${k}"><option value="">— Choisir —</option>${t.map(o => `<option>${o}</option>`).join("")}</select></label>`
+  : t === "textarea" ? `<label>${l}<textarea class="x" data-g="${g}" data-k="${k}"></textarea></label>`
+  : `<label>${l}<input class="x" data-g="${g}" data-k="${k}" type="${t || "text"}"></label>`;
+const blk = (title, g, f) => `<div class="blk"><h4>${title}</h4>${f.map(fx(g)).join("")}</div>`;
+const sub = (title, arr, obj, skip = []) => { const r = arr.filter(f => obj && obj[f[0]] && !skip.includes(f[0])); return r.length ? `<div class="blk"><h4>${title}</h4>${r.map(f => `<div class="kv"><small>${esc(f[1])}</small><b>${esc(obj[f[0]])}</b></div>`).join("")}</div>` : ""; };
 function nouveauV() {
   return `<div class="card"><h3>Nouvelle exploitation</h3>
-<label>Nom de l'exploitation<input id="xn"></label>
+${blk("👤 Identité de l'exploitant", "exploitant", FEX)}
+<div class="blk"><h4>🏡 Exploitation</h4><label>Nom de l'exploitation<input id="xn"></label>
 <label>Secteur<select id="sec" onchange="A.sect()">${Object.keys(SEC).map(s => `<option>${s}</option>`).join("")}</select></label>
 <label>Catégorie<select id="cat" onchange="A.cat()"></select></label><div id="dyn"></div>
 <label id="effl">Effectif (têtes)<input id="effectif" type="number"></label>
 <label>Surface / emprise (ha)<input id="surface" type="number" step="0.01"></label>
-<label>Production annuelle estimée (kg)<input id="prod" type="number"></label>
-<label>Province<select id="prov" onchange="A.prov()">${Object.keys(PROVINCES).map(p => `<option>${p}</option>`).join("")}</select></label>
+<label>Production annuelle estimée (kg)<input id="prod" type="number"></label></div>
+${blk("🌳 Zone, foncier et organisation", "zone", FZO)}
+<div class="blk"><h4>📍 Localisation</h4><label>Province<select id="prov" onchange="A.prov()">${Object.keys(PROVINCES).map(p => `<option>${p}</option>`).join("")}</select></label>
 <label>Ville / commune<select id="ville" onchange="A.ville()"></select></label>
 <label>Quartier<input id="quartier" list="ql" placeholder="Choisir ou saisir"></label><datalist id="ql"></datalist>
 <label>Village / lieu-dit<input id="village" placeholder="Saisie libre"></label>
 <label>Position GPS<div class="gps"><input id="lat" placeholder="Latitude"><input id="lng" placeholder="Longitude"></div></label>
-<button class="b n" onclick="A.gps()">📍 Utiliser ma position</button><button class="b g" onclick="A.save()">Enregistrer</button><p id="msg" class="err"></p></div>`;
+<button class="b n" onclick="A.gps()">📍 Utiliser ma position</button></div>
+${blk("🌦️ Climat local et saison", "climat", FCL)}
+${blk("🗓️ Chronologie du système de culture / d'élevage", "chrono", FCH)}
+<button class="b g" onclick="A.save()">Enregistrer</button><p id="msg" class="err"></p></div>`;
 }
 A.sect = () => { $("#cat").innerHTML = Object.keys(SEC[$("#sec").value]).map(c => `<option>${c}</option>`).join(""); $("#effl").style.display = $("#sec").value === "Élevage" ? "" : "none"; A.cat(); A.prov(); };
 A.cat = () => { $("#dyn").innerHTML = SEC[$("#sec").value][$("#cat").value].map(fld).join(""); };
@@ -191,8 +233,10 @@ A.save = async () => {
   const nom = $("#xn").value.trim(); if (!nom) return $("#msg").textContent = "Nom requis";
   const v = PROVINCES[$("#prov").value].villes[$("#ville").value], details = {};
   document.querySelectorAll(".d").forEach(i => details[i.dataset.k] = i.value);
+  const gx = { exploitant: {}, zone: {}, climat: {}, chrono: {} };
+  document.querySelectorAll(".x").forEach(i => { if (i.value) gx[i.dataset.g][i.dataset.k] = i.value; });
   const e = { uid: U.uid, nom, secteur: $("#sec").value, categorie: $("#cat").value, details, effectif: num($("#effectif").value), surface: num($("#surface").value), production: num($("#prod").value),
-    province: $("#prov").value, ville: $("#ville").value, quartier: $("#quartier").value, village: $("#village").value, lat: parseFloat($("#lat").value) || v.lat, lng: parseFloat($("#lng").value) || v.lng, created: serverTimestamp() };
+    province: $("#prov").value, ville: $("#ville").value, quartier: $("#quartier").value, village: $("#village").value, lat: parseFloat($("#lat").value) || v.lat, lng: parseFloat($("#lng").value) || v.lng, ...gx, created: serverTimestamp() };
   try { await addDoc(collection(db, "exploitations"), e); await load(); A.go("fermes"); } catch (x) { $("#msg").textContent = x.code || x.message; }
 };
 function ficheV() {
@@ -201,7 +245,7 @@ function ficheV() {
   return `<div class="card" id="print"><h3>${esc(e.nom)}</h3><p>${esc(e.secteur)} · ${esc(e.categorie)}</p>
 <p>📍 ${esc([e.village, e.quartier, e.ville, e.province].filter(Boolean).join(", "))}<br>GPS : ${e.lat?.toFixed?.(4)}, ${e.lng?.toFixed?.(4)}</p>
 <p>Effectif : ${e.effectif || "–"} · Surface : ${e.surface || 0} ha · Production : ${e.production || 0} kg/an · Mortalité : ${mort(e).toFixed(1)} %</p>
-<p>${Object.entries(e.details || {}).map(([k, v]) => `${esc(k)} : ${esc(v)}`).join("<br>")}</p><p class="mut">Code traçabilité : <b>${e.id}</b></p>
+${Object.keys(e.details || {}).length ? `<div class="blk"><h4>Détails de production</h4>${Object.entries(e.details).map(([k, v]) => `<div class="kv"><small>${esc(k)}</small><b>${esc(v)}</b></div>`).join("")}</div>` : ""}${sub("👤 Exploitant", FEX, e.exploitant, isStaff() || e.uid === U.uid ? [] : ["tel", "whatsapp", "email", "adresse", "naissance"])}${sub("🌳 Zone et organisation", FZO, e.zone)}${sub("🌦️ Climat local", FCL, e.climat)}${sub("🗓️ Chronologie", FCH, e.chrono)}<p class="mut">Code traçabilité : <b>${e.id}</b></p>
 <img alt="QR" src="https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(url)}"></div>
 <div class="card noprint"><button class="b g" onclick="print()">🖨️ Imprimer / PDF</button>${e.uid === U.uid || ROLE === "admin" ? `<button class="b r" onclick="A.del('${e.id}')">Supprimer</button>` : ""}</div>`;
 }
@@ -222,7 +266,7 @@ const notifV = () => `<div class="card"><h3>🔔 Alertes</h3>${alerts().map(e =>
 const traceV = () => `<div class="card"><h3>🔎 Traçabilité</h3><label>Code de l'exploitation / lot<input id="tc"></label><button class="b g" onclick="A.go('fiche',$('#tc').value.trim())">Rechercher</button></div>`;
 const howV = () => `<div class="card"><h3>❓ Comment ça marche</h3><p>1. <b>Inscrivez</b> votre exploitation (élevage ou agriculture).<br>2. <b>Saisie</b> quotidienne : pertes, intrants, vaccins.<br>3. <b>Alertes</b> automatiques si mortalité anormale.<br>4. <b>National</b> : suivi cartographique et statistiques.<br>5. <b>Traçabilité</b> : QR code par exploitation.</p></div>`;
 const REAL = [["PC-INFORMATIQUE (ce site)","https://pcinformatique28-cloud.github.io/pc-informatique-site/","Sites, applications & PWA sur mesure"],["AMBI241","https://ambi2412026-debug.github.io/ambi241","Annuaire des bars, restos et boîtes de nuit"],["MAGERANTE","https://magerante241-boop.github.io/magerante/","Caisse et inventaire pour bars, snacks et clubs"],["MALAGA","https://malagagabon-dot.github.io/malaga-gabon/","Location immobilière à Libreville"],["Gabon Sport Connect","https://gabon-sport-connect.web.app","Clubs, fédérations et athlètes"],["LE WORK","https://lework63-2b761.web.app","Clients et techniciens validés"],["BIJOU","https://bijouesno1-bit.github.io/bijou/","Billetterie en ligne sécurisée"],["TROC MAISON","https://trocmaison106-rgb.github.io/troc-maison/","Petites annonces de troc"],["ANEG","https://pcinformatique28-cloud.github.io/aneg-gabon/","Annuaire national des églises"],["LAV","https://gabonlave-spec.github.io/lavegabon/","Laveurs et laveuses au Gabon"]];
-const aboutV = () => `<div class="card"><h3>🌱 Neoferme</h3><p><b>De la ferme à l'assiette</b><br>Application de suivi des exploitations agricoles et d'élevage du Gabon : inscription des fermes, saisies quotidiennes, alertes, carte nationale et traçabilité. Version 0.7.</p><span class="chip">11<sup>e</sup> réalisation du studio PC-INFORMATIQUE</span></div>
+const aboutV = () => `<div class="card"><h3>🌱 Neoferme</h3><p><b>De la ferme à l'assiette</b><br>Application de suivi des exploitations agricoles et d'élevage du Gabon : inscription des fermes, saisies quotidiennes, alertes, carte nationale et traçabilité. Version 0.9.</p><span class="chip">11<sup>e</sup> réalisation du studio PC-INFORMATIQUE</span></div>
 <div class="card"><h3>👤 Créateur technique</h3><p><b>KOZANGUE ESSONO PATRICK BERTIN</b><br>Informaticien développeur · Fondateur de PC-INFORMATIQUE</p></div>
 <div class="card"><h3>🏢 Le studio PC-INFORMATIQUE</h3><p>Studio de développement basé à Libreville, Gabon, spécialisé dans la création de sites, d'applications et de PWA sur mesure pour les entreprises et les particuliers gabonais.</p><a class="lk" href="https://pcinformatique28-cloud.github.io/pc-informatique-site/" target="_blank" rel="noopener">Visiter le site du studio</a></div>
 <div class="card"><h3>📁 Nos réalisations</h3>${REAL.map((r, i) => `<a class="row" href="${r[1]}" target="_blank" rel="noopener"><b>${i + 1}. ${r[0]}</b><small>${r[2]}</small></a>`).join("")}<div class="row"><b>11. Neoferme</b><small>Suivi des fermes et traçabilité agricole · vous êtes ici</small></div></div>
@@ -241,5 +285,112 @@ function adminV() {
 A.csv = () => { const h = ["id", "nom", "secteur", "categorie", "province", "ville", "quartier", "village", "lat", "lng", "effectif", "surface_ha", "production_kg", "mortalite_%"];
   const r = EX.map(e => [e.id, e.nom, e.secteur, e.categorie, e.province, e.ville, e.quartier, e.village, e.lat, e.lng, e.effectif, e.surface, e.production, mort(e).toFixed(1)].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"));
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + h.join(";") + "\n" + r.join("\n")], { type: "text/csv" })); a.download = "neoferme-exploitations.csv"; a.click(); };
+
+// ---- forum ----
+const day = () => new Date().toISOString().slice(0, 10).replace(/-/g, "");
+let FP = [], FIMG = [], FOPEN = {}, FCM = {}, FQ = 10;
+const myHidden = () => { try { return JSON.parse(localStorage.nfHid || "[]"); } catch (e) { return []; } };
+const ago = t => (t && t.toDate ? t.toDate() : new Date()).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+const who = () => UN || (U.email || "membre").split("@")[0];
+const okImg = u => typeof u === "string" && u.startsWith("https://res.cloudinary.com/");
+const forumV = () => `<div class="card"><h3>💬 Forum Neoferme</h3>
+<textarea id="fxt" placeholder="Partagez une question, une astuce, une photo…" maxlength="2000"></textarea>
+<div id="fxh" class="thumbs"></div>
+<input id="fxf" type="file" accept="image/*" multiple hidden onchange="A.fpick(this)">
+<button class="b n" onclick="$('#fxf').click()">📷 Ajouter des photos</button>
+<label class="chk"><input type="checkbox" id="fxm"> Publier masqué (visible par moi et l'administration)</label>
+<p class="mut" id="fxq"></p>
+<button class="b g" onclick="A.fpost()">Publier</button><p id="msg" class="err"></p></div><div id="flist"><p class="mut cr">Chargement…</p></div>`;
+async function quota() {
+  try { const d = await getDoc(doc(db, "uploads", U.uid + "_" + day())); FQ = 10 - (d.exists() ? d.data().n || 0 : 0); } catch (e) { FQ = 10; }
+  const q = $("#fxq"); if (q) q.textContent = `📷 Photos restantes aujourd'hui : ${Math.max(FQ, 0)} / 10`;
+}
+A.fload = async () => { FIMG = []; FOPEN = {}; await quota(); await floadPosts(); };
+const thumbs = () => { const h = $("#fxh"); if (h) h.innerHTML = FIMG.map((f, i) => `<div class="th"><img src="${URL.createObjectURL(f)}"><b onclick="A.frm(${i})">✕</b></div>`).join(""); };
+A.fpick = inp => {
+  const room = Math.max(FQ - FIMG.length, 0), f = [...inp.files].filter(x => x.type.startsWith("image/"));
+  if (f.length > room) $("#msg").textContent = "Limite de 10 photos par jour : seules " + room + " photo(s) ajoutée(s).";
+  FIMG.push(...f.slice(0, room)); inp.value = ""; thumbs();
+};
+A.frm = i => { FIMG.splice(i, 1); thumbs(); };
+const shrink = f => new Promise(res => {
+  const im = new Image(), u = URL.createObjectURL(f);
+  im.onload = () => { const k = Math.min(1, 1280 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); c.toBlob(b => res(b || f), "image/jpeg", .82); };
+  im.onerror = () => res(f); im.src = u;
+});
+const upl = async f => {
+  const fd = new FormData(); fd.append("file", await shrink(f)); fd.append("upload_preset", CLOUD.preset);
+  const j = await (await fetch(`https://api.cloudinary.com/v1_1/${CLOUD.name}/image/upload`, { method: "POST", body: fd })).json();
+  if (!j.secure_url) throw new Error((j.error && j.error.message) || "Échec de l'envoi Cloudinary");
+  return j.secure_url;
+};
+A.fpost = async () => {
+  const t = $("#fxt").value.trim(), m = $("#msg");
+  if (!t && !FIMG.length) return m.textContent = "Écrivez un message ou ajoutez une photo.";
+  if (FIMG.length) {
+    if (CLOUD.name.startsWith("VOTRE")) return m.textContent = "Cloudinary n'est pas encore configuré dans app.js.";
+    await quota(); if (FIMG.length > FQ) return m.textContent = "Limite de 10 photos par jour atteinte.";
+  }
+  m.textContent = "Publication en cours…";
+  try {
+    const images = []; for (const f of FIMG) images.push(await upl(f));
+    await addDoc(collection(db, "forum"), { uid: U.uid, nom: who(), role: ROLE, texte: t, images, hidden: $("#fxm").checked, likes: [], nc: 0, created: serverTimestamp() });
+    if (images.length) await setDoc(doc(db, "uploads", U.uid + "_" + day()), { uid: U.uid, n: (10 - FQ) + images.length });
+    FIMG = []; $("#fxt").value = ""; $("#fxm").checked = false; thumbs(); m.textContent = ""; await quota(); await floadPosts();
+  } catch (x) { m.textContent = x.code || x.message; }
+};
+async function floadPosts() {
+  try { FP = (await getDocs(query(collection(db, "forum"), orderBy("created", "desc"), limit(60)))).docs.map(d => ({ id: d.id, ...d.data() })); }
+  catch (e) { FP = []; const l = $("#flist"); if (l) l.innerHTML = `<p class="err cr">${esc(e.code || e.message)}</p>`; return; }
+  drawPosts();
+}
+const postH = p => {
+  const mine = p.uid === U.uid, can = mine || ROLE === "admin", lk = p.likes || [], liked = lk.includes(U.uid), im = (p.images || []).filter(okImg);
+  return `<div class="card post${p.hidden ? " hid" : ""}"><div class="ph"><b>${esc(p.nom || "Membre")}</b><small>${esc(p.role || "")} · ${ago(p.created)}${p.hidden ? " · 🙈 masqué" : ""}</small></div>
+${p.texte ? `<p class="pt">${esc(p.texte)}</p>` : ""}${im.length ? `<div class="pg">${im.map(u => `<img loading="lazy" alt="" src="${esc(u)}" onclick="window.open(this.src)">`).join("")}</div>` : ""}
+<div class="pa"><button onclick="A.flike('${p.id}')">${liked ? "❤️" : "🤍"} ${lk.length}</button><button onclick="A.fcm('${p.id}')">💬 ${p.nc || 0}</button>
+${mine ? `<button onclick="A.fhide('${p.id}')">${p.hidden ? "👁️ Afficher" : "🙈 Masquer"}</button>` : ""}
+${can ? `<button onclick="A.fdel('${p.id}')">🗑️ Supprimer</button>` : ""}<button onclick="A.fme('${p.id}')">🚫 Retirer pour moi</button></div><div id="cm-${p.id}"></div></div>`;
+};
+function drawPosts() {
+  const h = myHidden(), l = FP.filter(p => (!p.hidden || p.uid === U.uid || isStaff()) && !h.includes(p.id)), box = $("#flist");
+  if (!box) return;
+  box.innerHTML = l.map(postH).join("") || `<p class="mut cr">Aucune publication pour le moment. Soyez le premier !</p>`;
+  Object.keys(FOPEN).forEach(id => { const c = $("#cm-" + id); if (c) c.innerHTML = cmH(id); });
+}
+A.flike = async id => {
+  const p = FP.find(x => x.id === id), l = (p.likes || []).includes(U.uid);
+  try { await updateDoc(doc(db, "forum", id), { likes: l ? arrayRemove(U.uid) : arrayUnion(U.uid) }); p.likes = l ? p.likes.filter(x => x !== U.uid) : [...(p.likes || []), U.uid]; drawPosts(); } catch (e) { alert(e.code || e.message); }
+};
+A.fhide = async id => { const p = FP.find(x => x.id === id); try { await updateDoc(doc(db, "forum", id), { hidden: !p.hidden }); p.hidden = !p.hidden; drawPosts(); } catch (e) { alert(e.code || e.message); } };
+A.fdel = async id => { if (!confirm("Supprimer cette publication pour tout le monde ?")) return; try { await deleteDoc(doc(db, "forum", id)); FP = FP.filter(x => x.id !== id); drawPosts(); } catch (e) { alert(e.code || e.message); } };
+A.fme = id => { try { localStorage.nfHid = JSON.stringify([...myHidden(), id]); } catch (e) {} drawPosts(); };
+const cmH = id => `${(FCM[id] || []).map(c => `<div class="cm"><b>${esc(c.nom)}</b><small>${ago(c.created)}</small><p>${esc(c.texte)}</p>${c.uid === U.uid || ROLE === "admin" ? `<a onclick="A.fcd('${id}','${c.id}')">Supprimer</a>` : ""}</div>`).join("") || '<p class="mut cr">Aucun commentaire.</p>'}
+<div class="cmf"><input id="ci-${id}" placeholder="Votre commentaire…" maxlength="500"><button class="b g" onclick="A.fcs('${id}')">Envoyer</button></div>`;
+async function cmLoad(id) { try { FCM[id] = (await getDocs(query(collection(db, "forum", id, "comments"), orderBy("created", "asc")))).docs.map(d => ({ id: d.id, ...d.data() })); } catch (e) { FCM[id] = []; } }
+A.fcm = async id => {
+  if (FOPEN[id]) { delete FOPEN[id]; $("#cm-" + id).innerHTML = ""; return; }
+  FOPEN[id] = 1; await cmLoad(id); $("#cm-" + id).innerHTML = cmH(id);
+};
+A.fcs = async id => {
+  const t = $("#ci-" + id).value.trim(); if (!t) return;
+  try {
+    await addDoc(collection(db, "forum", id, "comments"), { uid: U.uid, nom: who(), texte: t, created: serverTimestamp() });
+    await updateDoc(doc(db, "forum", id), { nc: increment(1) });
+    const p = FP.find(x => x.id === id); if (p) p.nc = (p.nc || 0) + 1;
+    await cmLoad(id); drawPosts();
+  } catch (e) { alert(e.code || e.message); }
+};
+A.fcd = async (id, cid) => {
+  try { await deleteDoc(doc(db, "forum", id, "comments", cid)); await updateDoc(doc(db, "forum", id), { nc: increment(-1) }); const p = FP.find(x => x.id === id); if (p) p.nc = Math.max((p.nc || 1) - 1, 0); await cmLoad(id); drawPosts(); } catch (e) { alert(e.code || e.message); }
+};
+
+A.fs = () => {
+  const m = $("#map"); if (!m || !map) return;
+  const on = m.classList.toggle("mapfs"); document.body.classList.toggle("fsmap", on);
+  const b = m.querySelector(".fsb"); if (b) { b.textContent = on ? "✕" : "⛶"; b.title = on ? "Quitter le plein écran" : "Plein écran"; }
+  setTimeout(() => map.invalidateSize(), 60);
+};
+A.pre = () => { const s = (k, v) => { const i = document.querySelector('.x[data-g="exploitant"][data-k="' + k + '"]'); if (i && v) i.value = v; }; s("email", U.email); s("nom", UN); };
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
