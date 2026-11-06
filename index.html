@@ -4,7 +4,7 @@
 <meta property="og:title" content="Neoferme — De la ferme à l'assiette"><meta property="og:description" content="Suivez vos exploitations, la carte nationale et la traçabilité, et échangez sur le forum. Partout au Gabon. 📞 +241 60 14 19 24">
 <meta property="og:url" content="https://pcinformatique28-cloud.github.io/neoferme/"><meta property="og:image" content="https://pcinformatique28-cloud.github.io/neoferme/assets/og-neoferme.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Neoferme — De la ferme à l'assiette"><meta name="twitter:image" content="https://pcinformatique28-cloud.github.io/neoferme/assets/og-neoferme.jpg">
-<link rel="manifest" href="manifest.json"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preload" as="image" href="assets/accueil.jpg"><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,Roboto,sans-serif;background:#eef2f7;color:#0b1f4d;padding:46px 0 64px}
 header{position:fixed;top:0;left:0;right:0;height:46px;background:#0b1f4d;color:#fff;display:flex;align-items:center;gap:10px;padding:0 10px;z-index:1000;border-bottom:3px solid #fcd116}
@@ -28,7 +28,11 @@ nav{position:fixed;bottom:0;left:0;right:0;height:60px;background:#fff;border-to
 
 body::before{content:"";position:fixed;inset:46px 0 60px;background:url(assets/fond.svg) center top/460px;opacity:.5;pointer-events:none;z-index:0;-webkit-mask-image:linear-gradient(#000 20%,rgba(0,0,0,.35));mask-image:linear-gradient(#000 20%,rgba(0,0,0,.35))}
 main{position:relative;z-index:1}
-#splash{position:fixed;inset:0;z-index:3000;background:linear-gradient(#cfe9f5,#eef8ee);animation:out .7s 5.4s forwards}#splash svg{width:100%;height:100%}
+#splash{position:fixed;inset:0;z-index:3000;background:linear-gradient(#cfe9f5,#eef8ee);}#splash svg{width:100%;height:100%}
+#splash::before{content:"";position:absolute;inset:0;background:url(assets/accueil.jpg) center/cover;opacity:.22}
+#animbox{position:absolute;inset:0}#splash svg{position:relative}
+#intro{position:absolute;inset:0;z-index:2;background:#0b1f4d;transition:opacity .7s}#intro img{width:100%;height:100%;object-fit:cover;display:block}#intro.off{opacity:0;pointer-events:none}
+#splash.fin{animation:out .7s forwards}
 @keyframes out{to{opacity:0;visibility:hidden}}
 .st{fill:none;stroke:#3f7d2c;stroke-width:5;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:dr var(--t,1s) var(--d,0s) ease-out forwards}@keyframes dr{to{stroke-dashoffset:0}}
 .pop{transform-box:fill-box;transform-origin:center bottom;transform:scale(0);animation:pp var(--t,.7s) var(--d,0s) cubic-bezier(.3,1.6,.5,1) forwards}@keyframes pp{to{transform:scale(var(--s,1))}}
@@ -79,7 +83,7 @@ body.fsmap main{z-index:2500}body.fsmap{overflow:hidden}
 .cmf{display:flex;gap:6px;align-items:center;margin-top:8px}.cmf input{margin:0}.cmf .b{width:auto;margin:0;padding:0 14px;flex:none}
 
 </style></head><body>
-<div id="splash" onclick="this.remove()"><svg viewBox="0 0 360 520" preserveAspectRatio="xMidYMid slice">
+<div id="splash" onclick="this.remove()"><div id="intro"><img src="assets/accueil.jpg" alt="Neoferme"></div><div id="animbox"></div><template id="tp"><svg viewBox="0 0 360 520" preserveAspectRatio="xMidYMid slice">
 <rect y="400" width="360" height="120" fill="#86bd5c"/><ellipse cx="110" cy="402" rx="46" ry="9" fill="#7a5632"/>
 <text class="ti" x="180" y="78" text-anchor="middle" font-family="sans-serif" font-weight="800" font-size="40" fill="#0b1f4d">Neoferme</text>
 <text class="ti" x="180" y="106" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#219e56">De la ferme à l'assiette</text>
@@ -94,8 +98,11 @@ body.fsmap main{z-index:2500}body.fsmap{overflow:hidden}
 <path d="M-15 -8l7 -6 5 6 6 -6 7 6" fill="none" stroke="#d9cdb4" stroke-width="2"/></g>
 <g transform="translate(232 492)"><g class="cow"><path d="M-44 -34q-12 8-8 30" fill="none" stroke="#333" stroke-width="3"/><g fill="#fff" stroke="#333" stroke-width="2"><rect x="-38" y="-30" width="9" height="30"/><rect x="-24" y="-30" width="9" height="30"/><rect x="18" y="-30" width="9" height="30"/><rect x="32" y="-30" width="9" height="30"/><rect x="-46" y="-64" width="92" height="38" rx="14"/><rect x="40" y="-72" width="28" height="28" rx="9"/></g>
 <ellipse cx="-20" cy="-48" rx="10" ry="7" fill="#333"/><ellipse cx="14" cy="-42" rx="8" ry="6" fill="#333"/><rect x="58" y="-56" width="12" height="12" rx="5" fill="#f4b6b6"/><circle cx="52" cy="-62" r="2.2" fill="#222"/><path d="M44 -72q-3-9 3-10M62 -72q3-9-3-10" fill="none" stroke="#c9b27c" stroke-width="3"/></g></g>
-</svg></div>
-<script>try{if(sessionStorage.sp)document.getElementById("splash").remove();else{sessionStorage.sp=1;setTimeout(function(){var e=document.getElementById("splash");e&&e.remove()},6200)}}catch(e){}</script>
+</svg></template></div>
+<script>(function(){var sp=document.getElementById("splash"),seen=false;try{seen=!!sessionStorage.sp;sessionStorage.sp=1}catch(e){}
+if(seen){sp.remove();return}
+setTimeout(function(){var b=document.getElementById("animbox");if(!b)return;b.appendChild(document.getElementById("tp").content.cloneNode(true));document.getElementById("intro").className="off"},2400);
+setTimeout(function(){sp.className="fin"},7800);setTimeout(function(){sp.remove()},8600)})()</script>
 <header><button onclick="A.menu()">☰</button><img src="assets/icone-192.png" alt=""><b>Neoferme</b><button id="adm" style="display:none" onclick="A.go('admin')" title="Administration">🛠️</button><button onclick="A.go('notif')">🔔<i id="badge"></i></button><button onclick="A.user()">👤</button></header>
 <main id="main"></main><nav id="nav"></nav><div id="drawer"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script type="module" src="app.js"></script></body></html>
