@@ -1,0 +1,4 @@
+.dp{display:block!important;padding-bottom:90px!important;overscroll-behavior:contain}
+.dp .sp{display:none!important;height:0!important;flex:none!important}
+.dp hr{margin:12px 0}
+#drawer.open~#eph{display:none!important}
