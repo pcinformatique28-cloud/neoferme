@@ -48,6 +48,7 @@ const isStaff = () => STAFF.includes(ROLE);
 // ---- données ----
 async function load() {
   try { EX = (await getDocs(collection(db, "exploitations"))).docs.map(d => ({ id: d.id, ...d.data() })); } catch (e) { EX = []; }
+  await pullForum();
   if (!U) { SA = []; return; }
   try { SA = (await getDocs(collection(db, "saisies"))).docs.map(d => ({ id: d.id, ...d.data() })).filter(s => isStaff() || s.uid === U.uid); } catch (e) { SA = []; }
 }
@@ -56,34 +57,34 @@ onAuthStateChanged(auth, async u => {
   if (u) { try { const d = await getDoc(doc(db, "users", u.uid)); ROLE = d.exists() ? (d.data().role || "eleveur") : "eleveur"; UN = d.exists() ? (d.data().nom || "") : ""; } catch (e) {} }
   await load();
   if (u) { if (view === "login") view = "home"; if (location.hash.startsWith("#lot=")) { view = "fiche"; cur = location.hash.slice(5); } }
-  else if (!["home", "how", "about"].includes(view)) view = "home";
+  else if (!["home", "forum", "how", "about"].includes(view)) view = "home";
   render();
 });
 
 // ---- navigation ----
-const canForum = () => ["admin", "eleveur", "agriculteur"].includes(ROLE);
-const PUB = [["home", "🏠", "Accueil"], ["how", "❓", "Aide"], ["about", "ℹ️", "À propos"], ["login", "🔑", "Connexion"]];
+const canForum = () => !!U && ["admin", "eleveur", "agriculteur"].includes(ROLE);
+const PUB = [["home", "🏠", "Accueil"], ["forum", "💬", "Forum"], ["how", "❓", "Aide"], ["about", "ℹ️", "À propos"], ["login", "🔑", "Connexion"]];
 const TABS = [["home", "🏠", "Accueil"], ["saisie", "✍️", "Saisie"], ["fermes", "🌾", "Exploitations"], ["national", "📊", "National"], ["trace", "🔎", "Traçabilité"], ["forum", "💬", "Forum"]];
-const tabs = () => TABS.filter(t => t[0] !== "forum" || canForum());
-A.go = (v, id) => { if (v === "forum" && !canForum()) v = "home"; if (!U && !["home", "how", "about", "login"].includes(v)) v = "login"; view = v; cur = id || null; $("#drawer").classList.remove("open"); window.scrollTo(0, 0); render(); };
+const tabs = () => TABS;
+A.go = (v, id) => { if (!U && !["home", "forum", "how", "about", "login"].includes(v)) v = "login"; view = v; cur = id || null; $("#drawer").classList.remove("open"); window.scrollTo(0, 0); render(); };
 A.menu = () => {
-  const items = U ? [...tabs(), ["notif", "🔔", "Notifications"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"]] : [["home", "🏠", "Accueil"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"], ["login", "🔑", "Connexion"]];
+  const items = U ? [...tabs(), ["notif", "🔔", "Notifications"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"]] : [["home", "🏠", "Accueil"], ["forum", "💬", "Forum"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"], ["login", "🔑", "Connexion"]];
   if (isStaff()) items.splice(tabs().length, 0, ["admin", "🛠️", "Administration"]);
-  $("#drawer").innerHTML = `<div class="dp"><b>Neoferme</b><br><small>${U ? esc(U.email) + "<br>Rôle : " + esc(ROLE) : "Visiteur"}</small><hr>${items.map(i => `<a onclick="A.go('${i[0]}')">${i[1]} ${i[2]}</a>`).join("")}${U ? '<a onclick="A.out()">🚪 Déconnexion</a>' : ""}</div><div class="dbg" onclick="A.menu()"></div>`;
+  $("#drawer").innerHTML = `<div class="dp"><b>Neoferme</b><br><small>${U ? esc(U.email) + "<br>Rôle : " + esc(ROLE) : "Visiteur"}</small><hr>${items.map(i => `<a onclick="A.go('${i[0]}')">${i[1]} ${i[2]}${nbHtml(i[0], "nbi")}</a>`).join("")}${U ? '<a onclick="A.out()">🚪 Déconnexion</a>' : ""}</div><div class="dbg" onclick="A.menu()"></div>`;
   $("#drawer").classList.toggle("open");
 };
 A.user = () => U ? A.menu() : A.go("login");
 A.out = () => { signOut(auth); $("#drawer").classList.remove("open"); };
 
 function render() {
-  $("#nav").innerHTML = (U ? tabs() : PUB).map(t => `<a class="${view === t[0] ? "on" : ""}" onclick="A.go('${t[0]}')"><span>${t[1]}</span>${t[2]}</a>`).join("");
-  $("#badge").style.display = alerts().length ? "block" : "none";
+  $("#nav").innerHTML = navH();
+  if (view === "notif" && U) { NEWA = unreadAlerts().map(e => e.id); markA(); }
+  updBell();
   $("#adm").style.display = U && isStaff() ? "flex" : "none";
   document.body.classList.remove("fsmap");
   if (map) { map.remove(); map = null; }
   const main = $("#main");
-  if (!U && !["home", "how", "about"].includes(view)) view = "login";
-  if (view === "forum" && !canForum()) view = "home";
+  if (!U && !["home", "forum", "how", "about"].includes(view)) view = "login";
   if (!U && view === "login") { main.innerHTML = loginV(); return; }
   main.innerHTML = ({ home: homeV, saisie: saisieV, fermes: fermesV, national: nationalV, trace: traceV, notif: notifV, how: howV, about: aboutV, admin: adminV, fiche: ficheV, nouveau: nouveauV, forum: forumV }[view] || homeV)();
   if (view === "home" || view === "national") initMap();
@@ -115,6 +116,23 @@ A.reset = async () => { const e = $("#em").value.trim(); if (!e) return $("#msg"
 
 // ---- accueil : carte au premier plan ----
 const alerts = () => EX.filter(e => mort(e) > 5);
+// ---- badges de non-lus ----
+let NEWA = [];
+const lsGet = (k, d) => { try { const v = JSON.parse(localStorage[k]); return v == null ? d : v; } catch (e) { return d; } };
+const lsSet = (k, v) => { try { localStorage[k] = JSON.stringify(v); } catch (e) {} };
+const unreadAlerts = () => { const s = lsGet("nfSA", []); return U ? alerts().filter(e => !s.includes(e.id)) : []; };
+const markA = () => lsSet("nfSA", alerts().map(e => e.id));
+const fSeen = () => { let v = +lsGet("nfFs", 0); if (!v) { v = Date.now(); lsSet("nfFs", v); } return v; };
+const ms = p => p.created && p.created.toMillis ? p.created.toMillis() : 0;
+const vis = p => (!p.hidden || (U && (p.uid === U.uid || isStaff()))) && !myHidden().includes(p.id);
+const unreadForum = () => { const s = fSeen(); return FP.filter(p => vis(p) && !(U && p.uid === U.uid) && ms(p) > s).length; };
+const nbHtml = (id, cls) => { const n = id === "forum" ? unreadForum() : id === "notif" && U ? unreadAlerts().length + unreadForum() : 0; return n ? `<i class="${cls}">${n > 99 ? "99+" : n}</i>` : ""; };
+const navH = () => (U ? tabs() : PUB).map(t => `<a class="${view === t[0] ? "on" : ""}" onclick="A.go('${t[0]}')"><span>${t[1]}</span>${t[2]}${nbHtml(t[0], "nb")}</a>`).join("");
+const updBell = () => { const n = U ? unreadAlerts().length + unreadForum() : 0, b = $("#badge"); if (!b) return; b.textContent = n > 99 ? "99+" : n; b.style.display = n ? "flex" : "none"; };
+A.fseen = () => { lsSet("nfFs", Date.now()); const n = $("#nav"); if (n) n.innerHTML = navH(); updBell(); };
+async function pullForum() { try { FP = (await getDocs(query(collection(db, "forum"), orderBy("created", "desc"), limit(60)))).docs.map(d => ({ id: d.id, ...d.data() })); } catch (e) { FP = []; } }
+setInterval(async () => { if (document.visibilityState !== "visible" || view === "forum") return; await pullForum(); const n = $("#nav"); if (n) n.innerHTML = navH(); updBell(); }, 60000);
+
 const tile = (ic, n, l, go) => `<div class="tile" onclick="A.go('${go}')"><span>${ic}</span><b>${n}</b><small>${l}</small></div>`;
 const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 let F = { q: "", sec: "", cat: "", prov: "", ville: "", st: "" }, ML, MK = {};
@@ -262,7 +280,8 @@ A.saisie = async () => { try { await addDoc(collection(db, "saisies"), { uid: U.
 // ---- national / notifs / divers ----
 const byProv = () => { const o = {}; EX.forEach(e => (o[e.province] ||= []).push(e)); return o; };
 const nationalV = () => `<div id="map" class="map"></div><div class="card"><h3>Mortalité moyenne par province (%)</h3>${Object.entries(byProv()).map(([p, l]) => { const m = l.reduce((a, e) => a + mort(e), 0) / l.length; return `<div class="bar"><span>${esc(p)}</span><i style="width:${Math.min(m * 10, 100)}%"></i><b>${m.toFixed(1)}</b></div>`; }).join("") || "<p class='mut'>Pas encore de données.</p>"}</div>`;
-const notifV = () => `<div class="card"><h3>🔔 Alertes</h3>${alerts().map(e => `<div class="row" onclick="A.go('fiche','${e.id}')"><b>${esc(e.nom)}</b><small>Mortalité ${mort(e).toFixed(1)} % (> 5 %) · ${esc(e.ville)}</small></div>`).join("") || "<p class='mut'>Aucune alerte.</p>"}</div>`;
+const notifV = () => { const nf = unreadForum(), al = alerts();
+  return `<div class="card"><h3>🔔 Notifications</h3>${nf ? `<div class="row" onclick="A.go('forum')"><b>💬 ${nf} nouvelle(s) publication(s) dans le forum</b><small>Toucher pour lire</small></div>` : ""}${al.map(e => `<div class="row" onclick="A.go('fiche','${e.id}')"><b>${NEWA.includes(e.id) ? "🆕 " : ""}${esc(e.nom)}</b><small>Mortalité ${mort(e).toFixed(1)} % (> 5 %) · ${esc(e.ville)}</small></div>`).join("")}${!nf && !al.length ? "<p class='mut'>Aucune notification.</p>" : ""}</div>`; };
 const traceV = () => `<div class="card"><h3>🔎 Traçabilité</h3><label>Code de l'exploitation / lot<input id="tc"></label><button class="b g" onclick="A.go('fiche',$('#tc').value.trim())">Rechercher</button></div>`;
 const howV = () => `<div class="card"><h3>❓ Comment ça marche</h3><p>1. <b>Inscrivez</b> votre exploitation (élevage ou agriculture).<br>2. <b>Saisie</b> quotidienne : pertes, intrants, vaccins.<br>3. <b>Alertes</b> automatiques si mortalité anormale.<br>4. <b>National</b> : suivi cartographique et statistiques.<br>5. <b>Traçabilité</b> : QR code par exploitation.</p></div>`;
 const REAL = [["PC-INFORMATIQUE (ce site)","https://pcinformatique28-cloud.github.io/pc-informatique-site/","Sites, applications & PWA sur mesure"],["AMBI241","https://ambi2412026-debug.github.io/ambi241","Annuaire des bars, restos et boîtes de nuit"],["MAGERANTE","https://magerante241-boop.github.io/magerante/","Caisse et inventaire pour bars, snacks et clubs"],["MALAGA","https://malagagabon-dot.github.io/malaga-gabon/","Location immobilière à Libreville"],["Gabon Sport Connect","https://gabon-sport-connect.web.app","Clubs, fédérations et athlètes"],["LE WORK","https://lework63-2b761.web.app","Clients et techniciens validés"],["BIJOU","https://bijouesno1-bit.github.io/bijou/","Billetterie en ligne sécurisée"],["TROC MAISON","https://trocmaison106-rgb.github.io/troc-maison/","Petites annonces de troc"],["ANEG","https://pcinformatique28-cloud.github.io/aneg-gabon/","Annuaire national des églises"],["LAV","https://gabonlave-spec.github.io/lavegabon/","Laveurs et laveuses au Gabon"]];
@@ -293,19 +312,24 @@ const myHidden = () => { try { return JSON.parse(localStorage.nfHid || "[]"); } 
 const ago = t => (t && t.toDate ? t.toDate() : new Date()).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 const who = () => UN || (U.email || "membre").split("@")[0];
 const okImg = u => typeof u === "string" && u.startsWith("https://res.cloudinary.com/");
-const forumV = () => `<div class="card"><h3>💬 Forum Neoferme</h3>
+const needBox = () => !U
+  ? `<div class="card"><h3>💬 Forum Neoferme</h3><p>🔒 La lecture est ouverte à tous. <b>Inscrivez-vous</b> pour publier, commenter et aimer les publications.</p><button class="b g" onclick="mode='reg';A.go('login')">Créer un compte</button><button class="b n" onclick="mode='login';A.go('login')">Se connecter</button></div>`
+  : `<div class="card"><h3>💬 Forum Neoferme</h3><p>La lecture est ouverte à tous. Seuls les éleveurs, agriculteurs et l'administrateur peuvent publier.</p></div>`;
+const composer = () => `<div class="card"><h3>💬 Forum Neoferme</h3>
 <textarea id="fxt" placeholder="Partagez une question, une astuce, une photo…" maxlength="2000"></textarea>
 <div id="fxh" class="thumbs"></div>
 <input id="fxf" type="file" accept="image/*" multiple hidden onchange="A.fpick(this)">
 <button class="b n" onclick="$('#fxf').click()">📷 Ajouter des photos</button>
 <label class="chk"><input type="checkbox" id="fxm"> Publier masqué (visible par moi et l'administration)</label>
 <p class="mut" id="fxq"></p>
-<button class="b g" onclick="A.fpost()">Publier</button><p id="msg" class="err"></p></div><div id="flist"><p class="mut cr">Chargement…</p></div>`;
+<button class="b g" onclick="A.fpost()">Publier</button><p id="msg" class="err"></p></div>`;
+const forumV = () => (canForum() ? composer() : needBox()) + `<div id="flist"><p class="mut cr">Chargement…</p></div>`;
+A.need = () => { if (!U) { if (confirm("Inscrivez-vous pour participer au forum. Créer un compte maintenant ?")) { mode = "reg"; A.go("login"); } } else alert("Seuls les éleveurs, agriculteurs et l'administrateur peuvent participer."); };
 async function quota() {
   try { const d = await getDoc(doc(db, "uploads", U.uid + "_" + day())); FQ = 10 - (d.exists() ? d.data().n || 0 : 0); } catch (e) { FQ = 10; }
   const q = $("#fxq"); if (q) q.textContent = `📷 Photos restantes aujourd'hui : ${Math.max(FQ, 0)} / 10`;
 }
-A.fload = async () => { FIMG = []; FOPEN = {}; await quota(); await floadPosts(); };
+A.fload = async () => { FIMG = []; FOPEN = {}; if (canForum()) await quota(); await floadPosts(); A.fseen(); };
 const thumbs = () => { const h = $("#fxh"); if (h) h.innerHTML = FIMG.map((f, i) => `<div class="th"><img src="${URL.createObjectURL(f)}"><b onclick="A.frm(${i})">✕</b></div>`).join(""); };
 A.fpick = inp => {
   const room = Math.max(FQ - FIMG.length, 0), f = [...inp.files].filter(x => x.type.startsWith("image/"));
@@ -345,7 +369,7 @@ async function floadPosts() {
   drawPosts();
 }
 const postH = p => {
-  const mine = p.uid === U.uid, can = mine || ROLE === "admin", lk = p.likes || [], liked = lk.includes(U.uid), im = (p.images || []).filter(okImg);
+  const mine = !!U && p.uid === U.uid, can = canForum() && (mine || ROLE === "admin"), lk = p.likes || [], liked = !!U && lk.includes(U.uid), im = (p.images || []).filter(okImg);
   return `<div class="card post${p.hidden ? " hid" : ""}"><div class="ph"><b>${esc(p.nom || "Membre")}</b><small>${esc(p.role || "")} · ${ago(p.created)}${p.hidden ? " · 🙈 masqué" : ""}</small></div>
 ${p.texte ? `<p class="pt">${esc(p.texte)}</p>` : ""}${im.length ? `<div class="pg">${im.map(u => `<img loading="lazy" alt="" src="${esc(u)}" onclick="window.open(this.src)">`).join("")}</div>` : ""}
 <div class="pa"><button onclick="A.flike('${p.id}')">${liked ? "❤️" : "🤍"} ${lk.length}</button><button onclick="A.fcm('${p.id}')">💬 ${p.nc || 0}</button>
@@ -353,26 +377,28 @@ ${mine ? `<button onclick="A.fhide('${p.id}')">${p.hidden ? "👁️ Afficher" :
 ${can ? `<button onclick="A.fdel('${p.id}')">🗑️ Supprimer</button>` : ""}<button onclick="A.fme('${p.id}')">🚫 Retirer pour moi</button></div><div id="cm-${p.id}"></div></div>`;
 };
 function drawPosts() {
-  const h = myHidden(), l = FP.filter(p => (!p.hidden || p.uid === U.uid || isStaff()) && !h.includes(p.id)), box = $("#flist");
+  const l = FP.filter(vis), box = $("#flist");
   if (!box) return;
   box.innerHTML = l.map(postH).join("") || `<p class="mut cr">Aucune publication pour le moment. Soyez le premier !</p>`;
   Object.keys(FOPEN).forEach(id => { const c = $("#cm-" + id); if (c) c.innerHTML = cmH(id); });
 }
 A.flike = async id => {
+  if (!canForum()) return A.need();
   const p = FP.find(x => x.id === id), l = (p.likes || []).includes(U.uid);
   try { await updateDoc(doc(db, "forum", id), { likes: l ? arrayRemove(U.uid) : arrayUnion(U.uid) }); p.likes = l ? p.likes.filter(x => x !== U.uid) : [...(p.likes || []), U.uid]; drawPosts(); } catch (e) { alert(e.code || e.message); }
 };
 A.fhide = async id => { const p = FP.find(x => x.id === id); try { await updateDoc(doc(db, "forum", id), { hidden: !p.hidden }); p.hidden = !p.hidden; drawPosts(); } catch (e) { alert(e.code || e.message); } };
 A.fdel = async id => { if (!confirm("Supprimer cette publication pour tout le monde ?")) return; try { await deleteDoc(doc(db, "forum", id)); FP = FP.filter(x => x.id !== id); drawPosts(); } catch (e) { alert(e.code || e.message); } };
 A.fme = id => { try { localStorage.nfHid = JSON.stringify([...myHidden(), id]); } catch (e) {} drawPosts(); };
-const cmH = id => `${(FCM[id] || []).map(c => `<div class="cm"><b>${esc(c.nom)}</b><small>${ago(c.created)}</small><p>${esc(c.texte)}</p>${c.uid === U.uid || ROLE === "admin" ? `<a onclick="A.fcd('${id}','${c.id}')">Supprimer</a>` : ""}</div>`).join("") || '<p class="mut cr">Aucun commentaire.</p>'}
-<div class="cmf"><input id="ci-${id}" placeholder="Votre commentaire…" maxlength="500"><button class="b g" onclick="A.fcs('${id}')">Envoyer</button></div>`;
+const cmH = id => `${(FCM[id] || []).map(c => `<div class="cm"><b>${esc(c.nom)}</b><small>${ago(c.created)}</small><p>${esc(c.texte)}</p>${canForum() && (c.uid === U.uid || ROLE === "admin") ? `<a onclick="A.fcd('${id}','${c.id}')">Supprimer</a>` : ""}</div>`).join("") || '<p class="mut cr">Aucun commentaire.</p>'}
+${canForum() ? `<div class="cmf"><input id="ci-${id}" placeholder="Votre commentaire…" maxlength="500"><button class="b g" onclick="A.fcs('${id}')">Envoyer</button></div>` : `<button class="b n" onclick="A.need()">🔒 Inscrivez-vous pour commenter</button>`}`;
 async function cmLoad(id) { try { FCM[id] = (await getDocs(query(collection(db, "forum", id, "comments"), orderBy("created", "asc")))).docs.map(d => ({ id: d.id, ...d.data() })); } catch (e) { FCM[id] = []; } }
 A.fcm = async id => {
   if (FOPEN[id]) { delete FOPEN[id]; $("#cm-" + id).innerHTML = ""; return; }
   FOPEN[id] = 1; await cmLoad(id); $("#cm-" + id).innerHTML = cmH(id);
 };
 A.fcs = async id => {
+  if (!canForum()) return A.need();
   const t = $("#ci-" + id).value.trim(); if (!t) return;
   try {
     await addDoc(collection(db, "forum", id, "comments"), { uid: U.uid, nom: who(), texte: t, created: serverTimestamp() });
