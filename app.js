@@ -749,3 +749,44 @@ DEMO.push(
     clim: dc("Littoral océanique", 2300, 26, "Sableux", "Eau de pluie", "Embruns salés et sols sableux pauvres"),
     chr: dh("Janvier", "Décembre", 10, 1, "Plantation de rejets, entretien, récolte des régimes toute l'année.", "Plantation en début de saison des pluies.", "Paillage avec les feuilles sèches pour garder l'humidité du sol.") }
 );
+
+/* Couleurs tuiles + menu latéral, trait jaune mobile sous l'onglet ouvert */
+(() => {
+  const tc = ["#1f9d55", "#2f6db5", "#e8731a", "#8e44ad", "#c0392b", "#138d90", "#a67c00", "#c2185b", "#3949ab", "#6d4c41"];
+  const mc = ["#1f9d55", "#2f6db5", "#8e44ad", "#e8731a", "#138d90", "#c2185b", "#3949ab", "#a67c00", "#c0392b", "#00796b", "#5d4037", "#455a64"];
+  let css = ".tiles .tile{background-color:var(--c,#2f6db5)!important;background-image:linear-gradient(145deg,rgba(255,255,255,.2),rgba(0,0,0,.12))!important;border:0!important;box-shadow:0 4px 10px rgba(0,0,0,.18)!important}.tiles .tile span,.tiles .tile b,.tiles .tile small{color:#fff!important}.tiles .tile:active{filter:brightness(.92)}";
+  tc.forEach((c, i) => { css += `.tiles .tile:nth-child(${tc.length}n+${i + 1}){--c:${c}}`; });
+  css += ".dp>a{background-color:var(--c,#2f6db5)!important;background-image:linear-gradient(145deg,rgba(255,255,255,.2),rgba(0,0,0,.1))!important;color:#fff!important;border:0!important;border-radius:12px!important;box-shadow:0 2px 6px rgba(0,0,0,.15)}.dp>a *{color:#fff!important}.dp>a:active{filter:brightness(.92)}";
+  mc.forEach((c, i) => { css += `.dp>a:nth-of-type(${mc.length}n+${i + 1}){--c:${c}}`; });
+  css += "#nav-bar{position:absolute;bottom:2px;height:4px;width:36px;border-radius:4px;background:#f5c518;pointer-events:none;z-index:5;transition:left .35s cubic-bezier(.4,0,.2,1),width .35s cubic-bezier(.4,0,.2,1),opacity .2s}";
+  const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+
+  const bar = document.createElement("i"); bar.id = "nav-bar";
+  let lastL = null, lastW = null;
+  const alias = { fiche: "fermes", nouveau: "fermes" };
+  const tabOf = nav => {
+    const kids = [...nav.children].filter(k => k !== bar), v = alias[view] || view;
+    let t = kids.find(k => (k.getAttribute("onclick") || "").includes(`'${v}'`));
+    if (!t) t = kids.find(k => /(^|\s)(on|act|active|sel|cur|current)(\s|$)/.test(k.className));
+    if (!t) { const col = kids.map(k => getComputedStyle(k).color), u = kids.filter((k, i) => col.filter(c => c === col[i]).length === 1); if (u.length === 1) t = u[0]; }
+    return t;
+  };
+  const place = () => {
+    const nav = document.getElementById("nav"); if (!nav) return;
+    if (getComputedStyle(nav).position === "static") nav.style.position = "relative";
+    if (bar.parentNode !== nav) {
+      if (lastL !== null) { bar.style.left = lastL + "px"; bar.style.width = lastW + "px"; }
+      nav.appendChild(bar); void bar.offsetWidth;
+    }
+    const t = tabOf(nav);
+    if (!t) { bar.style.opacity = "0"; return; }
+    const nr = nav.getBoundingClientRect(), tr = t.getBoundingClientRect(), w = Math.min(36, tr.width * .6);
+    lastL = tr.left - nr.left + nav.scrollLeft + (tr.width - w) / 2; lastW = w;
+    bar.style.opacity = "1"; bar.style.left = lastL + "px"; bar.style.width = w + "px";
+  };
+  const r1 = render;
+  render = function () { const x = r1.apply(this, arguments); place(); setTimeout(place, 60); return x; };
+  const nav0 = document.getElementById("nav");
+  if (nav0) new MutationObserver(() => requestAnimationFrame(place)).observe(nav0, { childList: true });
+  addEventListener("resize", place); addEventListener("load", place); setTimeout(place, 500);
+})();
