@@ -8,7 +8,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const ADMIN_EMAIL = "pcinformatique28@gmail.com";
 let U = null, ROLE = "", NAME = "", ALL = [], PEND = 0, unsubs = [], pubL = [], mineL = [], admL = [];
-const staff = () => !!U && ((U.email === ADMIN_EMAIL && U.emailVerified) || ["admin", "technicien", "ministere"].includes(ROLE));
+const staff = () => !!U && ((U.email === ADMIN_EMAIL && U.emailVerified) || ROLE === "admin");
 const SEC = {
   agriculture: { ico: "🌾", nom: "Agriculture", cible: "Culture concernée", ex: "Manioc, banane plantain, tomate, cacao…", tr: "Vent, pluie, insectes, outils, semences, sol contaminé…", cond: "arracher et détruire les plants atteints, ne pas composter, ne pas déplacer plants/semences, nettoyer les outils, prévenir le service agricole." },
   elevage: { ico: "🐔", nom: "Élevage", cible: "Espèce / catégorie d'animaux", ex: "Poulets, porcs, bovins, ovins, caprins…", tr: "Contact direct, aliment, eau, personnes, véhicules, oiseaux sauvages…", cond: "isoler les animaux malades, limiter déplacements et ventes, désinfecter, ne pas consommer ni vendre animaux morts/malades, appeler le service vétérinaire." },
@@ -16,8 +16,9 @@ const SEC = {
 };
 const GRAV = { faible: ["Faible", "#f9a825"], moyenne: ["Moyenne", "#ef6c00"], elevee: ["Élevée", "#d32f2f"], critique: ["Critique", "#7f0000"] };
 const RANK = { faible: 1, moyenne: 2, elevee: 3, critique: 4 };
-const ST = { en_attente: "En attente de validation", publiee: "Publiée", close: "Clôturée", rejetee: "Rejetée" };
+const ST = { en_attente: "⏳ En attente de validation par l'administration", publiee: "Publiée", close: "Clôturée", rejetee: "❌ Refusée par l'administration" };
 const ts = a => a.publishedAt?.seconds || a.created?.seconds || 0;
+const REJ = () => U ? ALL.filter(a => a.uid === U.uid && a.status === "rejetee").length : 0;
 const fmt = t => t?.seconds ? new Date(t.seconds * 1000).toLocaleDateString("fr-FR") : "";
 
 const st = document.createElement("style");
@@ -63,7 +64,7 @@ const x = () => $("#alo").classList.remove("on");
 
 function list(f) {
   f = f || "all"; const s = staff();
-  const card = a => { const g = GRAV[a.gravite] || GRAV.moyenne; return `<div class="alc" style="border-left:6px solid ${g[1]}" onclick="AL.v('${a.id}')"><b>${SEC[a.secteur]?.ico || "🚨"} ${esc(a.titre)}</b><br><small>${SEC[a.secteur]?.nom || ""} · ${esc(a.cible || "")} · 📍 ${esc(a.zone || "")}</small><br><span class="gb" style="background:${g[1]}">${g[0]}</span>${a.status !== "publiee" ? `<span class="gb" style="background:#555">${ST[a.status] || ""}</span>` : ""}</div>`; };
+  const card = a => { const g = GRAV[a.gravite] || GRAV.moyenne; return `<div class="alc" style="border-left:6px solid ${g[1]}" onclick="AL.v('${a.id}')"><b>${SEC[a.secteur]?.ico || "🚨"} ${esc(a.titre)}</b><br><small>${SEC[a.secteur]?.nom || ""} · ${esc(a.cible || "")} · 📍 ${esc(a.zone || "")}</small><br><span class="gb" style="background:${g[1]}">${g[0]}</span>${a.status !== "publiee" ? `<span class="gb" style="background:${a.status === "rejetee" ? "#c62828" : "#ef6c00"}">${ST[a.status] || ""}</span>` : ""}</div>`; };
   const srt = (a, b) => (RANK[b.gravite] || 0) - (RANK[a.gravite] || 0) || ts(b) - ts(a);
   const pub = ALL.filter(a => a.status === "publiee" && (f === "all" || a.secteur === f)).sort(srt);
   const pend = s ? ALL.filter(a => a.status === "en_attente") : [], clo = s ? ALL.filter(a => ["close", "rejetee"].includes(a.status)) : [];
@@ -81,15 +82,18 @@ function view(id) {
   const a = ALL.find(z => z.id === id); if (!a) return;
   const g = GRAV[a.gravite] || GRAV.moyenne, s = SEC[a.secteur] || SEC.elevage, adm = staff();
   const blk = (t, v, c) => v ? `<div class="alb2 ${c || ""}"><h4>${t}</h4><p>${esc(v).replace(/\n/g, "<br>")}</p></div>` : "";
-  const acts = adm ? `<hr>${a.status !== "publiee" ? `<button class="alx2 g" onclick="AL.set('${id}','publiee')">🚨 Publier en urgence</button>` : `<button class="alx2 k" onclick="AL.set('${id}','close')">✅ Clôturer l'alerte</button>`}${a.status === "en_attente" ? `<button class="alx2 o" onclick="AL.set('${id}','rejetee')">Rejeter</button>` : ""}<button class="alx2" onclick="AL.f('${id}')">✏️ Compléter / modifier la fiche</button><button class="alx2 k" onclick="AL.del('${id}')">🗑️ Supprimer</button>` : "";
+  const own = !!U && a.uid === U.uid;
+  const ban = a.status === "en_attente" ? `<div class="alb2" style="background:#fff3e0;border:1px solid #ffb74d"><h4>⏳ En attente de validation par l'administration</h4><p>Ce signalement n'est pas encore visible du public.</p></div>` : a.status === "rejetee" ? `<div class="alb2 red"><h4>❌ Signalement refusé par l'administration</h4><p>Motif : ${esc(a.motifRefus || "non précisé")}</p></div>` : "";
+  const mod = own && !adm && ["en_attente", "rejetee"].includes(a.status) ? `<button class="alx2 o" onclick="AL.f('${id}')">✏️ Corriger et renvoyer à l'administration</button>` : "";
+  const acts = adm ? `<hr>${a.status !== "publiee" ? `<button class="alx2 g" onclick="AL.set('${id}','publiee')">🚨 Publier en urgence</button>` : `<button class="alx2 k" onclick="AL.set('${id}','close')">✅ Clôturer l'alerte</button>`}${a.status === "en_attente" ? `<button class="alx2 o" onclick="AL.rej('${id}')">❌ Refuser (avec motif)</button>` : ""}<button class="alx2" onclick="AL.f('${id}')">✏️ Compléter / modifier la fiche</button><button class="alx2 k" onclick="AL.del('${id}')">🗑️ Supprimer</button>` : "";
   sheet(`<span class="gb" style="background:${g[1]}">Gravité : ${g[0]}</span>${a.status !== "publiee" ? `<span class="gb" style="background:#555">${ST[a.status] || ""}</span>` : ""}
-  <h2>${s.ico} ${esc(a.titre)}</h2><p class="mt">${s.nom} · ${esc(a.cible || "")} · 📍 ${esc(a.zone || "")}${a.dateApparition ? " · depuis le " + esc(a.dateApparition) : ""}${a.nbCas ? " · " + a.nbCas + " cas" : ""}</p>
+  ${ban}<h2>${s.ico} ${esc(a.titre)}</h2><p class="mt">${s.nom} · ${esc(a.cible || "")} · 📍 ${esc(a.zone || "")}${a.dateApparition ? " · depuis le " + esc(a.dateApparition) : ""}${a.nbCas ? " · " + a.nbCas + " cas" : ""}</p>
   ${blk("⚠️ Signes et symptômes", a.symptomes)}${blk("🦠 Transmission / propagation", a.transmission)}
   ${a.remede ? blk("💊 Remède / traitement", a.remede, "ok") : `<div class="alb2"><h4>💊 Remède / traitement</h4><p>Aucun remède ou traitement spécifique confirmé à ce jour.</p></div>`}
   ${blk("🛡️ Prévention", a.prevention)}${blk("📋 Conduite officielle à tenir", a.conduite, "red")}${blk("☎️ Contacts officiels", a.contactsOff)}
   <p class="mt">Signalé par ${esc(a.auteur || "—")}${a.publishedAt ? " · publié le " + fmt(a.publishedAt) : ""}</p>
   <p class="mt">ℹ️ Information préventive. En cas de doute, contactez les services officiels compétents (vétérinaires, agricoles ou sanitaires).</p>
-  <button class="alx2" onclick="AL.sh('${id}')">📤 Partager l'alerte</button><button class="alx2 k" onclick="AL.list()">← Retour aux alertes</button>${acts}`, "Alerte maladie");
+  ${a.status === "publiee" ? `<button class="alx2" onclick="AL.sh('${id}')">📤 Partager l'alerte</button>` : ""}${mod}<button class="alx2 k" onclick="AL.list()">← Retour aux alertes</button>${acts}`, "Alerte maladie");
 }
 
 function form(id) {
@@ -127,19 +131,20 @@ async function save(id) {
   if (adm) Object.assign(d, { remede: g("remede"), prevention: g("prev"), conduite: g("conduite"), contactsOff: g("coff") });
   const urg = adm && $("#al_urg")?.checked;
   try {
-    if (id) await updateDoc(doc(db, COL, id), { ...d, updated: serverTimestamp(), ...(urg && ALL.find(z => z.id === id)?.status !== "publiee" ? { status: "publiee", publishedAt: serverTimestamp() } : {}) });
+    if (id) await updateDoc(doc(db, COL, id), { ...d, updated: serverTimestamp(), ...(!adm ? { status: "en_attente", motifRefus: "" } : {}), ...(urg && ALL.find(z => z.id === id)?.status !== "publiee" ? { status: "publiee", publishedAt: serverTimestamp() } : {}) });
     else await addDoc(collection(db, COL), { ...d, uid: U.uid, auteur: NAME || (U.email || "").split("@")[0], role: ROLE, status: urg ? "publiee" : "en_attente", created: serverTimestamp(), ...(urg ? { publishedAt: serverTimestamp() } : {}) });
-    alert(urg ? "🚨 Alerte publiée." : "✅ Signalement envoyé, en attente de validation."); setTimeout(() => list(), 400);
+    alert(urg ? "🚨 Alerte publiée." : adm ? "✅ Enregistré." : "✅ Signalement envoyé. Il est en attente de validation par l'administration."); setTimeout(() => list(), 400);
   } catch (e) { msg.textContent = "Erreur : " + (e.code || e.message); }
 }
-async function setSt(id, status) { try { await updateDoc(doc(db, COL, id), { status, updated: serverTimestamp(), ...(status === "publiee" ? { publishedAt: serverTimestamp() } : {}) }); setTimeout(() => list(), 400); } catch (e) { alert("Erreur : " + (e.code || e.message)); } }
+async function setSt(id, status) { try { await updateDoc(doc(db, COL, id), { status, updated: serverTimestamp(), ...(status === "publiee" ? { publishedAt: serverTimestamp(), motifRefus: "" } : {}) }); setTimeout(() => list(), 400); } catch (e) { alert("Erreur : " + (e.code || e.message)); } }
+async function rej(id) { const m = (prompt("Motif du refus (communiqué à l'auteur) :") || "").trim(); if (m.length < 5) { alert("Indiquez un motif (5 caractères minimum)."); return; } try { await updateDoc(doc(db, COL, id), { status: "rejetee", motifRefus: m, decisionAt: serverTimestamp(), updated: serverTimestamp() }); setTimeout(() => list(), 400); } catch (e) { alert("Erreur : " + (e.code || e.message)); } }
 async function del(id) { if (!confirm("Supprimer définitivement cette alerte ?")) return; try { await deleteDoc(doc(db, COL, id)); setTimeout(() => list(), 400); } catch (e) { alert("Erreur : " + (e.code || e.message)); } }
 async function share(id) {
   const a = ALL.find(z => z.id === id); if (!a) return;
   const t = `🚨 Alerte maladie Neoferme : ${a.titre} (${a.cible || ""}, ${a.zone || ""})\nSymptômes : ${a.symptomes}\n${a.conduite ? "Conduite à tenir : " + a.conduite : ""}\n${location.origin}${location.pathname}`;
   try { if (navigator.share) await navigator.share({ title: "Alerte maladie", text: t }); else { await navigator.clipboard.writeText(t); alert("Texte copié."); } } catch (e) {}
 }
-window.AL = { list, v: view, f: form, sc, save, set: setSt, del, sh: share, x };
+window.AL = { list, v: view, f: form, sc, save, set: setSt, rej, del, sh: share, x };
 
 if (window.A?.menu) {
   const m = A.menu;
@@ -147,7 +152,7 @@ if (window.A?.menu) {
     const r = m.apply(this, arguments), dp = document.querySelector("#drawer .dp");
     if (dp && !dp.querySelector(".al-l")) {
       const css = "background:linear-gradient(135deg,#e53935,#b71c1c);color:#fff;border-radius:14px;padding:14px 16px;margin:10px 0;box-shadow:0 3px 8px #0003";
-      const h = `<a class="al-l" style="${css}" onclick="AL.list()">🚨 Alertes maladie${PEND ? ` (${PEND} à valider)` : ""}</a><a style="${css}" onclick="AL.f()">➕ Signaler une maladie</a>`;
+      const h = `<a class="al-l" style="${css}" onclick="AL.list()">🚨 Alertes maladie${PEND ? ` (${PEND} à valider)` : ""}${REJ() ? ` (${REJ()} refusée${REJ() > 1 ? "s" : ""})` : ""}</a><a style="${css}" onclick="AL.f()">➕ Signaler une maladie</a>`;
       const hr = dp.querySelector("hr"); if (hr) hr.insertAdjacentHTML("afterend", h); else dp.insertAdjacentHTML("beforeend", h);
     }
     return r;
