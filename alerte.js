@@ -285,3 +285,22 @@ if (window.A?.menu) {
   };
 }
 band(); badge();
+
+/* Bouton Se connecter : points animes pendant la connexion (3 s minimum) */
+(function () {
+  if (!window.A || !A.auth || A.auth.__ld) return;
+  const o = A.auth, st = document.createElement("style");
+  st.textContent = "@keyframes ldb{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-4px)}}.ld-btn{pointer-events:none;opacity:.92}.ld-d{display:inline-block;margin-left:6px}.ld-d i{display:inline-block;width:8px;height:8px;margin:0 2px;border-radius:50%;background:#fff;animation:ldb 1s infinite}.ld-d i:nth-child(2){animation-delay:.2s}.ld-d i:nth-child(3){animation-delay:.4s}";
+  document.head.appendChild(st);
+  A.auth = function () {
+    const b = document.querySelector('button[onclick*="A.auth"],a[onclick*="A.auth"]');
+    if (!b || b.classList.contains("ld-btn")) return o.apply(this, arguments);
+    const t0 = Date.now(), old = b.innerHTML; let r;
+    b.innerHTML = 'Connexion<span class="ld-d"><i></i><i></i><i></i></span>'; b.classList.add("ld-btn");
+    const end = () => setTimeout(() => { if (b.isConnected) { b.innerHTML = old; b.classList.remove("ld-btn"); } }, Math.max(0, 3000 - (Date.now() - t0)));
+    try { r = o.apply(this, arguments); } catch (e) { end(); throw e; }
+    if (r && typeof r.finally === "function") r.finally(end); else setTimeout(end, 4000);
+    return r;
+  };
+  A.auth.__ld = 1;
+})();
