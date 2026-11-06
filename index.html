@@ -55,7 +55,7 @@ header b{text-align:left}
 .lk{min-height:40px;display:flex;align-items:center;justify-content:center}
 nav a{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;font-size:9.5px;line-height:1.2}
 nav a span{font-size:20px;line-height:1;margin-bottom:2px}
-.dp{text-align:center}.dp a{display:flex;align-items:center;justify-content:flex-start;gap:12px;min-height:48px;padding:0 14px;margin:6px 0;border:1px solid #dfe6f2;border-radius:10px;background:#f8faff}
+.dp{text-align:center}.dp{display:flex;flex-direction:column}.dp>*{flex:none}.dp>.sp{flex:1;min-height:10px}.dp a{display:flex;align-items:center;justify-content:flex-start;gap:12px;min-height:44px;padding:0 14px;margin:4px 0;border:1px solid #dfe6f2;border-radius:10px;background:#f8faff}
 .dp hr{border:0;border-top:1px solid #e3e8f0;margin:12px 0}
 th,td{text-align:center;vertical-align:middle}
 .blk{border:1px solid #d6dff0;border-radius:12px;padding:10px 12px 6px;margin:12px 0;background:#fff;text-align:left}
@@ -75,6 +75,18 @@ nav a{position:relative}.nb{position:absolute;top:3px;left:calc(50% + 4px);min-w
 .cam{position:absolute;right:-2px;bottom:-2px;background:#fff;border:2px solid #d6dff0;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-size:18px}
 .pw{display:flex;gap:10px;align-items:center}.pi{display:flex;flex-direction:column;text-align:left}.pi small{margin:0}
 [hidden]{display:none!important}
+.demo{display:inline-block;background:#fcd116;color:#0b1f4d;font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;margin-left:4px;vertical-align:middle}
+.mini{border:1px solid #f0c9c9;background:#fff5f5;border-radius:8px;padding:4px 8px;font-size:15px}
+.gg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}.gi{display:flex;flex-direction:column;gap:6px}.gi img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px}
+.ga{display:flex;gap:6px}.ga button{flex:1;min-height:40px;border:1px solid #dfe6f2;border-radius:10px;background:#f6f8fc;font-size:18px}
+#lb{position:fixed;inset:0;background:#000d;z-index:4000;display:flex;align-items:center;justify-content:center}#lb img{max-width:96vw;max-height:88vh;border-radius:8px}
+#lb button{position:absolute;top:12px;right:12px;width:44px;height:44px;border-radius:50%;border:0;background:#fff;font-size:20px;font-weight:700}
+#eph{position:fixed;left:12px;right:12px;bottom:72px;z-index:1200;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.ep{pointer-events:auto;display:flex;align-items:center;background:#fff;border:2px solid #fcd116;border-radius:999px;box-shadow:0 4px 14px #0004;animation:epin .35s ease-out}
+.ep button{background:none;border:0;padding:11px 8px 11px 18px;font-weight:700;color:#0b1f4d;font-size:14px}
+.ep b{width:34px;height:34px;margin-right:6px;border-radius:50%;background:#eef1f6;display:flex;align-items:center;justify-content:center;font-size:15px;color:#0b1f4d}
+@keyframes epin{from{opacity:0;transform:translateY(14px)}}
+.pw{cursor:pointer}
 /* carte plein écran */
 .fsb{background:#fff;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:20px;border-radius:4px;border:2px solid rgba(0,0,0,.25);text-decoration:none;color:#0b1f4d;font-weight:700}
 .mapfs{position:fixed!important;inset:0!important;height:100%!important;width:100%!important;min-height:0!important;border-radius:0!important;margin:0!important}
@@ -115,4 +127,5 @@ setTimeout(function(){var b=document.getElementById("animbox");if(!b)return;b.ap
 setTimeout(function(){sp.className="fin"},7800);setTimeout(function(){sp.remove()},8600)})()</script>
 <header><button onclick="A.menu()">☰</button><img src="assets/icone-192.png" alt=""><b>Neoferme</b><button id="adm" style="display:none" onclick="A.go('admin')" title="Administration">🛠️</button><button onclick="A.go('notif')">🔔<i id="badge"></i></button><button id="usr" onclick="A.user()">👤</button></header>
 <main id="main"></main><nav id="nav"></nav><div id="drawer"></div>
+<script>window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.DIP=e;if(window.ephInstall)window.ephInstall()})</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script type="module" src="app.js"></script></body></html>
