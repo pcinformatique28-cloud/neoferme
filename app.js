@@ -790,3 +790,24 @@ DEMO.push(
   if (nav0) new MutationObserver(() => requestAnimationFrame(place)).observe(nav0, { childList: true });
   addEventListener("resize", place); addEventListener("load", place); setTimeout(place, 500);
 })();
+
+/* Démo : ne crée que les exploitations manquantes (les règles interdisent de modifier les saisies existantes) */
+A.demoOn = async () => {
+  if (ROLE !== "admin") return;
+  const m = $("#dmsg"), todo = DEMO.filter(d => !EX.some(e => e.id === "demo-" + d.id));
+  if (!todo.length) { m.textContent = "✅ Toutes les exploitations démo sont déjà présentes."; return; }
+  if (!confirm("Ajouter " + todo.length + " nouvelle(s) exploitation(s) démo avec leurs profils ?")) return;
+  let n = 0;
+  try {
+    for (const d of todo) {
+      const i = DEMO.indexOf(d), v = PROVINCES[d.prov].villes[d.ville], lat = +(v.lat + ((i * 7) % 11 - 5) * .004).toFixed(5), lng = +(v.lng + ((i * 5) % 11 - 5) * .004).toFixed(5);
+      m.textContent = "Création " + (n + 1) + " / " + todo.length + " : " + d.nom + "…";
+      await setDoc(doc(db, "profils", "demo_" + d.id), { demo: true, uid: "demo_" + d.id, nom: d.ex.prenom + " " + d.ex.nom, photo: "", profil: d.ex.profil, prov: d.ex.rprov, ville: d.ex.rville, bio: d.ex.bio, photos: [], updated: serverTimestamp() });
+      await setDoc(doc(db, "exploitations", "demo-" + d.id), { uid: U.uid, demo: true, profilId: "demo_" + d.id, nom: d.nom, secteur: d.sec, categorie: d.cat, details: d.det, effectif: d.eff, surface: d.surf, production: d.prod,
+        province: d.prov, ville: d.ville, quartier: d.q, village: d.vil, lat, lng, exploitant: d.ex, zone: d.zone, climat: d.clim, chrono: d.chr, created: serverTimestamp() });
+      for (const [j, mo] of d.morts.entries()) { try { await setDoc(doc(db, "saisies", "demo-" + d.id + "-" + (j + 1)), { uid: U.uid, demo: true, exploId: "demo-" + d.id, date: new Date(Date.now() - (j + 1) * 864e5).toISOString().slice(0, 10), morts: mo, aliment: d.aliment, vaccin: "", created: serverTimestamp() }); } catch (e) {} }
+      n++;
+    }
+    await load(); render(); const m2 = $("#dmsg"); if (m2) m2.textContent = "✅ " + n + " exploitation(s) démo ajoutée(s).";
+  } catch (x) { m.textContent = "Erreur sur « " + (todo[n] ? todo[n].nom : "?") + " » : " + (x.code || x.message); }
+};
