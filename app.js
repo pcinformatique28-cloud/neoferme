@@ -637,3 +637,30 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 /* Oeil afficher/masquer mot de passe */
 A.eye = (b) => { const i = b.previousElementSibling, s = i.type === "password"; i.type = s ? "text" : "password"; b.textContent = s ? "🙈" : "👁️"; b.setAttribute("aria-label", s ? "Masquer le mot de passe" : "Afficher le mot de passe"); };
 (() => { const st = document.createElement("style"); st.textContent = ".pw-wrap{position:relative;display:block}.pw-wrap input{padding-right:52px!important;width:100%;box-sizing:border-box}.pw-eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:0;font-size:22px;line-height:1;padding:6px;cursor:pointer;width:auto;margin:0;box-shadow:none}"; document.head.appendChild(st); })();
+
+/* Menu : croix de fermeture + déconnexion toujours visibles */
+(() => {
+  const st = document.createElement("style");
+  st.textContent = ".dp{position:relative}.dp-x{position:sticky;top:0;display:block;margin:0 0 4px auto;width:40px;height:40px;border:0;border-radius:50%;background:#0b1f4d;color:#fff;font-size:20px;line-height:1;z-index:3}.dp-out{position:sticky;bottom:0;display:block;width:100%;margin-top:14px;padding:14px;border:0;border-radius:12px;background:#c62828;color:#fff;font-size:1rem;font-weight:700;z-index:3;box-shadow:0 -8px 10px #fff}";
+  document.head.appendChild(st);
+  const m = A.menu;
+  A.menu = function () {
+    const r = m.apply(this, arguments);
+    const d = document.getElementById("drawer");
+    if (d && !d.dataset.cl) { d.dataset.cl = "1"; d.addEventListener("click", e => { if (e.target === d) d.classList.remove("open"); }); }
+    const dp = document.querySelector("#drawer .dp");
+    if (dp && !dp.querySelector(".dp-x")) {
+      dp.insertAdjacentHTML("afterbegin", '<button type="button" class="dp-x" aria-label="Fermer le menu" onclick="document.getElementById(\'drawer\').classList.remove(\'open\')">✕</button>');
+      if (dp.querySelector(".me")) dp.insertAdjacentHTML("beforeend", '<button type="button" class="dp-out" onclick="A.out()">🚪 Se déconnecter</button>');
+    }
+    return r;
+  };
+})();
+
+/* Nouvelles catégories de cultures */
+Object.assign(SEC["Agriculture"], {
+  "Oignons & Aromates": [["cultures", "Cultures", ["Oignon", "Échalote", "Ail", "Poireau", "Ciboulette", "Persil", "Mixte"]], ["variete", "Variété", ["Violet de Galmi", "Red Creole", "Texas Grano", "Locale", "Autre"]], ["irrigation", "Irrigation", ["Pluviale", "Arrosage", "Goutte-à-goutte"]], ["cycle", "Durée du cycle (jours)", "number"]],
+  "Tomates & Piments": [["cultures", "Cultures", ["Tomate", "Piment", "Poivron", "Aubergine", "Gombo", "Concombre", "Mixte"]], ["variete", "Variété", ["Roma", "Rio Grande", "Cœur de bœuf", "Piment oiseau", "Habanero", "Locale", "Autre"]], ["abri", "Mode de culture", ["Plein champ", "Sous tunnel / serre", "Hors-sol"]], ["irrigation", "Irrigation", ["Pluviale", "Arrosage", "Goutte-à-goutte"]]],
+  "Bananeraies": [["cultures", "Cultures", ["Banane plantain", "Banane douce", "Mixte"]], ["pieds", "Nb de pieds", "number"], ["age", "Âge des plantations (ans)", "number"], ["associe", "Culture associée", ["Aucune", "Manioc", "Arachide", "Taro", "Maïs"]]],
+  "Ananeraies": [["cultures", "Variété", ["Cayenne lisse", "Pain de sucre", "MD2", "Locale"]], ["pieds", "Nb de plants", "number"], ["age", "Âge des plantations (mois)", "number"], ["irrigation", "Irrigation", ["Pluviale", "Arrosage", "Goutte-à-goutte"]]]
+});
