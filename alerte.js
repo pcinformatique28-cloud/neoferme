@@ -278,8 +278,8 @@ if (window.A?.menu) {
   A.menu = function () {
     const r = m.apply(this, arguments), dp = document.querySelector("#drawer .dp");
     if (dp && !dp.querySelector(".al-t")) {
-      const n = unseen(), h = `<a class="al-t" onclick="AL.list()">🚨 Alertes maladie${n ? `<b class="alq">${staff() ? n + " à valider" : n}</b>` : ""}</a><a class="al-t" onclick="AL.f()">➕ Signaler une maladie</a>`;
-      const hr = dp.querySelector("hr"); if (hr) hr.insertAdjacentHTML("afterend", h); else dp.insertAdjacentHTML("beforeend", h);
+      const n = unseen(), h = `<a class="al-t" onclick="AL.list()">🚨 Alertes maladie${n ? `<b class="alq">${staff() ? n + " à valider" : n}</b>` : ""}</a>`;
+      const L = [...dp.querySelectorAll("a")], tg = dp.querySelector(".dp-out") || L.find(x => /D[ée]connexion/.test(x.textContent)) || L.find(x => /Connexion/.test(x.textContent)); if (tg) tg.insertAdjacentHTML("beforebegin", h); else dp.insertAdjacentHTML("beforeend", h);
     }
     return r;
   };
