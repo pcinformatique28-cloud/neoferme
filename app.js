@@ -11,7 +11,7 @@ const app = getApps()[0] || initializeApp(cfg || window.firebaseConfig);
 const auth = getAuth(app), db = getFirestore(app);
 
 // ---- Cloudinary (photos du forum) : renseigner le cloud name et le preset « unsigned » ----
-const CLOUD = { name: "VOTRE_CLOUD_NAME", preset: "VOTRE_UPLOAD_PRESET" };
+const CLOUD = { name: "zbof0xbh", preset: "neoferme_forum" };
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
