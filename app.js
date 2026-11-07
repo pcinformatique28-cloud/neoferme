@@ -440,7 +440,7 @@ const profilV = () => `<div class="card"><h3>👤 Mon profil</h3>
 <div class="pav" onclick="$('#pfile').click()">${avatarH()}<span class="cam">📷</span></div>
 <input id="pfile" type="file" accept="image/*" hidden onchange="A.pphoto(this)">
 <button class="b n" onclick="$('#pfile').click()">📷 ${okImg(UP) ? "Changer" : "Ajouter"} ma photo</button>${okImg(UP) ? `<button class="b n" onclick="A.prm()">🗑️ Retirer ma photo</button>` : ""}
-<p class="mut">${esc(U.email)} · Rôle : <b>${esc(ROLE)}</b></p><p id="pmsg" class="err"></p></div>
+<p class="mut">${esc(U.email)} · Rôle : <b>${esc(ROLE)}</b></p><p id="pmsg" class="err"></p></div><div class="card"><h3>🔳 Mon QR code membre</h3><img alt="QR membre" style="width:180px;height:180px;display:block;margin:8px auto" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent("M:"+U.uid)}"><p class="mut">Faites scanner ce code (onglet Traçabilité) pour ouvrir mon profil.</p></div>
 ${blk("Mes informations", "prof", PRF)}
 ${A.domV ? A.domV() : ""}<button class="b g" onclick="A.psave()">Enregistrer mon profil</button><p id="msg" class="err"></p>
 <div class="card" id="gal"><p class="mut cr">Chargement de la galerie…</p></div>`;
