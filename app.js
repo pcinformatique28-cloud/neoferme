@@ -615,6 +615,7 @@ A.mload = async () => {
   const ph = (p.photos || []).filter(x => okImg(x.u)), ex = EX.filter(e => e.uid === cur || e.profilId === cur);
   b.innerHTML = `<div class="card"><div class="pav">${okImg(p.photo) ? `<img class="av" src="${esc(p.photo)}" alt="" onclick="A.lb(this.src)">` : `<span class="av">${initial(p.nom)}</span>`}</div><h3>${esc(p.nom || "Membre")} ${dem(p)}</h3>
 <p class="mut">${esc([p.profil, p.ville, p.prov].filter(Boolean).join(" · "))}</p>${p.bio ? `<p>${esc(p.bio)}</p>` : ""}</div>
+<div class="card"><h3>🔳 QR code du membre</h3><img alt="QR membre" style="width:180px;height:180px;display:block;margin:8px auto" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent("M:"+cur)}"><p class="mut">Scannez ce code dans l'onglet Traçabilité pour ouvrir ce profil.</p><button class="b n noprint" onclick="print()">🖨️ Imprimer</button></div>
 ${ex.length ? `<div class="card"><h3>🌾 Exploitations</h3>${ex.map(e => `<div class="row"${U ? ` onclick="A.go('fiche','${e.id}')"` : ""}><b>${esc(e.nom)} ${dem(e)}</b><small>${esc(e.categorie)} · ${esc(e.ville)}</small></div>`).join("")}</div>` : ""}
 <div class="card"><h3>🖼️ Galerie (${ph.length})</h3>${ph.length ? `<div class="gg">${ph.map(x => `<div class="gi"><img loading="lazy" src="${esc(x.u)}" alt="" onclick="A.lb(this.src)"></div>`).join("")}</div>` : `<p class="mut">Aucune photo pour le moment.</p>`}</div>`;
 };
