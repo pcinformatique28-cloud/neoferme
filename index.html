@@ -135,6 +135,7 @@ if(seen){sp.remove();return}
 setTimeout(function(){var b=document.getElementById("animbox");if(!b)return;b.appendChild(document.getElementById("tp").content.cloneNode(true));document.getElementById("intro").className="off"},2400);
 setTimeout(function(){sp.className="fin"},7800);setTimeout(function(){sp.remove()},8600)})()</script>
 <header><button onclick="A.menu()">☰</button><img src="assets/icone-192.png" alt=""><b>Neoferme</b><button id="adm" style="display:none" onclick="A.go('admin')" title="Administration">🛠️</button><button onclick="A.go('notif')">🔔<i id="badge"></i></button><button id="usr" onclick="A.user()">👤</button></header>
+<style id="navfit">#nav{overflow-x:auto!important}#nav a{flex:1 0 auto!important;min-width:0!important;padding:0 3px!important;font-size:9px!important;white-space:nowrap}#nav a span{font-size:19px!important}</style>
 <main id="main"></main><nav id="nav"></nav><div id="drawer"></div>
 <script>window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.DIP=e;if(window.ephInstall)window.ephInstall()})</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script type="module" src="app.js"></script><script type="module" src="alerte.js?v=1793964590"></script></body></html>
