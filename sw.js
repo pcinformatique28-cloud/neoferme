@@ -1,4 +1,4 @@
-const V = "nf-v10", RT = "nf-rt-v2", TILES = "nf-tiles-v1";
+const V = "nf-v11", RT = "nf-rt-v2", TILES = "nf-tiles-v1";
 const CORE = ["./", "index.html", "app.js","scan.js","jsqr.min.js","assets/nav-bg.jpg","assets/fond.jpg", "alerte.js", "offline.js", "gabon.js", "firebase-config.js", "manifest.json", "fix-menu.css", "assets/accueil.jpg", "assets/banniere.jpg", "assets/challenge.png", "assets/fermes.png", "assets/fond.svg", "assets/icone-192.png", "assets/icone-512.png", "assets/logo.jpg", "assets/logos.png"];
 const CDN = [
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
