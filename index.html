@@ -24,6 +24,8 @@ nav{position:fixed;bottom:0;left:0;right:0;height:60px;background:#fff;border-to
 .sbar button{border:0;background:#eaf0fd;border-radius:10px;font-size:19px;padding:8px 11px;position:relative}.sbar i{font-style:normal;position:absolute;top:-5px;right:-5px;min-width:17px;background:#f26b21;color:#fff;font-size:11px;border-radius:9px}.sbar i:empty{display:none}
 .fpn{display:none;background:rgba(255,255,255,.96);border-radius:14px;padding:4px 12px 8px;margin-top:8px;box-shadow:0 1px 4px #0002}.fpn.open{display:block}
 .chip{display:inline-block;background:#fff7d6;border:1px solid #fcd116;border-radius:20px;padding:6px 12px;font-weight:700;font-size:13px}.cr{text-align:center;font-size:12px;margin:14px 0 0}a.row{color:inherit;text-decoration:none}
+.tabs{display:flex;gap:8px}.tabs button{flex:1;padding:11px;border:0;border-radius:10px;background:#eaf0fd;font-weight:700;color:#0b1f4d;font-size:15px}.tabs button.on{background:#0b1f4d;color:#fff}.scr{overflow-x:auto}
+.bd{font-style:normal;background:#e33;color:#fff;border-radius:9px;font-size:11px;font-weight:700;padding:1px 6px;margin-left:6px}.bd:empty{display:none}.nw td{background:#fff7d6}
 @media print{header,nav,.noprint,#drawer,.map{display:none!important}body{padding:0;background:#fff}.card{box-shadow:none;margin:0}}
 
 body::before{content:"";position:fixed;inset:46px 0 60px;background:url(assets/fond.svg) center top/460px;opacity:.5;pointer-events:none;z-index:0;-webkit-mask-image:linear-gradient(#000 20%,rgba(0,0,0,.35));mask-image:linear-gradient(#000 20%,rgba(0,0,0,.35))}
@@ -106,6 +108,13 @@ body.fsmap main{z-index:2500}body.fsmap{overflow:hidden}
 
 </style><link rel="stylesheet" href="fix-menu.css"></head><body>
 <div id="splash" onclick="this.remove()"><div id="intro"><img src="assets/accueil.jpg" alt="Neoferme"></div><div id="animbox"></div><template id="tp"><svg viewBox="0 0 360 520" preserveAspectRatio="xMidYMid slice">
+#nav{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}#nav::-webkit-scrollbar{display:none}#nav a{flex:1 0 auto;min-width:76px;position:relative}#nav a .bd{position:absolute;top:2px;right:8px;margin:0}
+/* tracking */
+.bd{font-style:normal;background:#e33;color:#fff;border-radius:9px;font-size:11px;font-weight:700;padding:1px 6px;margin-left:6px}.bd:empty{display:none}.nw td{background:#fff7d6}
+.tabs{display:flex;gap:8px}.tabs button{flex:1;padding:11px;border:0;border-radius:10px;background:#eaf0fd;font-weight:700;color:#0b1f4d;font-size:15px}.tabs button.on{background:#0b1f4d;color:#fff}.scr{overflow-x:auto}
+#nav{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}#nav::-webkit-scrollbar{display:none}#nav a{flex:1 0 auto;min-width:76px}
+</style></head><body>
+<div id="splash" onclick="this.remove()"><svg viewBox="0 0 360 520" preserveAspectRatio="xMidYMid slice">
 <rect y="400" width="360" height="120" fill="#86bd5c"/><ellipse cx="110" cy="402" rx="46" ry="9" fill="#7a5632"/>
 <text class="ti" x="180" y="78" text-anchor="middle" font-family="sans-serif" font-weight="800" font-size="40" fill="#0b1f4d">Neoferme</text>
 <text class="ti" x="180" y="106" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#219e56">De la ferme à l'assiette</text>

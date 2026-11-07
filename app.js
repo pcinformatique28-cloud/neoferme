@@ -1,14 +1,16 @@
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, collection, getDocs, deleteDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove, query, orderBy, limit, increment } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, doc, collection, serverTimestamp, updateDoc, arrayUnion, arrayRemove, query, orderBy, limit, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { PROVINCES } from "./gabon.js";
+import { getDoc, setDoc, addDoc, getDocs, deleteDoc, initStatus } from "./offline.js";
 
 // ---- config Firebase : réutilise firebase-config.js existant ----
 let cfg;
 try { const m = await import("./firebase-config.js"); cfg = Object.values(m).find(v => v && v.apiKey) || (m.default && m.default.apiKey ? m.default : null); } catch (e) {}
 if (!cfg && !getApps().length) { try { const t = await (await fetch("firebase-config.js")).text(); const r = t.match(/\{[^{}]*apiKey[^{}]*\}/); if (r) cfg = new Function("return " + r[0])(); } catch (e) {} }
 const app = getApps()[0] || initializeApp(cfg || window.firebaseConfig);
-const auth = getAuth(app), db = getFirestore(app);
+const auth = getAuth(app);
+let db; try { db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch (e) { db = getFirestore(app); }
 
 // ---- Cloudinary (photos du forum) : renseigner le cloud name et le preset « unsigned » ----
 const CLOUD = { name: "zbof0xbh", preset: "neoferme_forum" };
@@ -16,7 +18,7 @@ const CLOUD = { name: "zbof0xbh", preset: "neoferme_forum" };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const STAFF = ["admin", "ministere", "technicien"];
-let U = null, UN = "", UP = "", UPF = {}, ROLE = "eleveur", EX = [], SA = [], view = "home", cur = null, mode = "login", map;
+let U = null, UN = "", NOM = "", UP = "", UPF = {}, ROLE = "eleveur", EX = [], SA = [], view = "home", cur = null, mode = "login", map;
 const A = window.A = {};
 window.$ = $;
 
@@ -55,7 +57,8 @@ async function load() {
 onAuthStateChanged(auth, async u => {
   U = u; ROLE = "eleveur"; UN = ""; UP = ""; UPF = {};
   if (u) { try { const d = await getDoc(doc(db, "users", u.uid)); ROLE = d.exists() ? (d.data().role || "eleveur") : "eleveur"; UPF = d.exists() ? d.data() : {}; UN = UPF.nom || ""; UP = UPF.photo || ""; } catch (e) {} }
-  await load();
+  NOM = UN;
+  await load(); track(); watchVis();
   if (u) { if (view === "login") view = "home"; if (location.hash.startsWith("#lot=")) { view = "fiche"; cur = location.hash.slice(5); } }
   else if (!["home", "forum", "membre", "how", "about"].includes(view)) view = "home";
   render();
@@ -71,7 +74,8 @@ A.menu = () => {
   const top = U ? [["home", "🏠", "Accueil"], ["profil", "👤", "Mon profil"], ["forum", "💬", "Forum"], ["notif", "🔔", "Notifications"], ["fermes", "🌾", "Exploitations"], ["saisie", "✍️", "Saisie"], ["national", "📊", "National"], ["trace", "🔎", "Traçabilité"]]
     : [["home", "🏠", "Accueil"], ["forum", "💬", "Forum"], ["login", "🔑", "Connexion"]];
   if (isStaff()) top.push(["admin", "🛠️", "Administration"]);
-  const bot = [["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"]], li = i => `<a onclick="A.go('${i[0]}')">${i[1]} ${i[2]}${nbHtml(i[0], "nbi")}</a>`;
+  if (ROLE === "admin") top.push(["trk", "📡", "Tracking"]);
+  const bot = [["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"]], li = i => `<a onclick="${i[0] === "trk" ? "A.trk()" : `A.go('${i[0]}')`}">${i[1]} ${i[2]}${nbHtml(i[0], "nbi")}${i[0] === "trk" ? `<i class="bd nbt">${newVis() || ""}</i>` : ""}</a>`;
   $("#drawer").innerHTML = `<div class="dp">${U ? `<div class="me" onclick="A.go('profil')">${avatarH()}<b>${esc(UN || "Mon profil")}</b><small>${esc(U.email)}<br>Rôle : ${esc(ROLE)}</small></div>` : "<b>Neoferme</b><br><small>Visiteur</small>"}<hr>${top.map(li).join("")}<div class="sp"></div><hr>${bot.map(li).join("")}${U ? '<a onclick="A.out()">🚪 Déconnexion</a>' : ""}</div><div class="dbg" onclick="A.menu()"></div>`;
   $("#drawer").classList.toggle("open");
 };
@@ -81,7 +85,7 @@ A.out = () => { signOut(auth); $("#drawer").classList.remove("open"); };
 function render() {
   $("#nav").innerHTML = navH();
   if (view === "notif" && U) { NEWA = unreadAlerts().map(e => e.id); markA(); }
-  updBell(); setAvatar();
+  updBell(); setAvatar(); updBadges();
   $("#adm").style.display = U && isStaff() ? "flex" : "none";
   document.body.classList.remove("fsmap");
   if (map) { map.remove(); map = null; }
@@ -130,9 +134,10 @@ const fSeen = () => { let v = +lsGet("nfFs", 0); if (!v) { v = Date.now(); lsSet
 const ms = p => p.created && p.created.toMillis ? p.created.toMillis() : 0;
 const vis = p => (!p.hidden || (U && (p.uid === U.uid || isStaff()))) && !myHidden().includes(p.id);
 const unreadForum = () => { const s = fSeen(); return FP.filter(p => vis(p) && !(U && p.uid === U.uid) && ms(p) > s).length; };
-const nbHtml = (id, cls) => { const n = id === "forum" ? unreadForum() : id === "notif" && U ? unreadAlerts().length + unreadForum() : 0; return n ? `<i class="${cls}">${n > 99 ? "99+" : n}</i>` : ""; };
-const navH = () => (U ? tabs() : PUB).map(t => `<a class="${view === t[0] ? "on" : ""}" onclick="A.go('${t[0]}')"><span>${t[1]}</span>${t[2]}${nbHtml(t[0], "nb")}</a>`).join("");
-const updBell = () => { const n = U ? unreadAlerts().length + unreadForum() : 0, b = $("#badge"); if (!b) return; b.textContent = n > 99 ? "99+" : n; b.style.display = n ? "flex" : "none"; };
+const nbHtml = (id, cls) => { const n = id === "forum" ? unreadForum() : id === "notif" && U ? unreadAlerts().length + unreadForum() + newVis() : 0; return n ? `<i class="${cls}">${n > 99 ? "99+" : n}</i>` : ""; };
+const navTabs = () => { const t = [...tabs()]; if (U && isStaff() && !t.some(x => x[0] === "admin")) t.push(["admin", "🛠️", "Admin"]); if (U && ROLE === "admin") t.push(["trk", "📡", "Tracking"]); return t; };
+const navH = () => (U ? navTabs() : PUB).map(t => { const k = t[0] === "trk", on = k ? (view === "admin" && atab === "track") : t[0] === "admin" ? (view === "admin" && atab !== "track") : view === t[0]; return `<a class="${on ? "on" : ""}" onclick="${k ? "A.trk()" : `A.go('${t[0]}')`}"><span>${t[1]}</span>${t[2]}${k ? (newVis() ? `<i class="nb">${newVis()}</i>` : "") : nbHtml(t[0], "nb")}</a>`; }).join("");
+const updBell = () => { const n = U ? unreadAlerts().length + unreadForum() + newVis() : 0, b = $("#badge"); if (!b) return; b.textContent = n > 99 ? "99+" : n; b.style.display = n ? "flex" : "none"; };
 A.fseen = () => { lsSet("nfFs", Date.now()); const n = $("#nav"); if (n) n.innerHTML = navH(); updBell(); };
 async function pullForum() { try { FP = (await getDocs(query(collection(db, "forum"), orderBy("created", "desc"), limit(60)))).docs.map(d => ({ id: d.id, ...d.data() })); } catch (e) { FP = []; } }
 setInterval(async () => { if (document.visibilityState !== "visible" || view === "forum") return; await pullForum(); const n = $("#nav"); if (n) n.innerHTML = navH(); updBell(); }, 60000);
@@ -163,7 +168,7 @@ function homeV() {
 <label>Ville<select id="fv" onchange="A.filt()">${opts(villeList(), F.ville, "Toutes les villes")}</select></label>
 ${U ? `<label>État<select id="ft" onchange="A.filt()"><option value="">Tous</option><option value="normal" ${F.st === "normal" ? "selected" : ""}>Normal</option><option value="alerte" ${F.st === "alerte" ? "selected" : ""}>En alerte (mortalité élevée)</option></select></label>` : ""}
 <button class="b n" onclick="A.freset()">Réinitialiser</button></div></div>
-<div id="map" class="map"></div><div id="rs"></div><div class="tiles" id="tl">${tilesV()}</div>`;
+<div id="map" class="map"></div><div id="rs"></div><div class="tiles" id="tl">${tilesV()}</div>${U ? "" : `<p class="mut cr">ℹ️ Des statistiques de visite (pays, ville, heure) sont enregistrées. <a onclick="A.go('about')">En savoir plus</a></p>`}`;
 }
 A.fp = () => $("#fpn").classList.toggle("open");
 A.freset = () => { F = { q: "", sec: "", cat: "", prov: "", ville: "", st: "" }; render(); };
@@ -188,7 +193,7 @@ function refreshHome() {
 function initMap() {
   if (!window.L || !$("#map")) return;
   map = L.map("map", { minZoom: 5, maxBounds: [[-4.8, 8], [2.9, 15]] }).setView([-0.8, 11.6], 6);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { crossOrigin: true, attribution: "© OpenStreetMap" }).addTo(map);
   ML = L.layerGroup().addTo(map);
   new (L.Control.extend({ onAdd() { const b = L.DomUtil.create("a", "fsb"); b.href = "#"; b.title = "Plein écran"; b.textContent = "⛶"; L.DomEvent.disableClickPropagation(b); L.DomEvent.on(b, "click", ev => { L.DomEvent.preventDefault(ev); A.fs(); }); return b; } }))({ position: "topleft" }).addTo(map);
   if (view === "home") refreshHome(); else EX.filter(e => e.lat).forEach(e => mkr(e).addTo(ML));
@@ -285,7 +290,7 @@ A.saisie = async () => { try { await addDoc(collection(db, "saisies"), { uid: U.
 const byProv = () => { const o = {}; EX.forEach(e => (o[e.province] ||= []).push(e)); return o; };
 const nationalV = () => `<div id="map" class="map"></div><div class="card"><h3>Mortalité moyenne par province (%)</h3>${Object.entries(byProv()).map(([p, l]) => { const m = l.reduce((a, e) => a + mort(e), 0) / l.length; return `<div class="bar"><span>${esc(p)}</span><i style="width:${Math.min(m * 10, 100)}%"></i><b>${m.toFixed(1)}</b></div>`; }).join("") || "<p class='mut'>Pas encore de données.</p>"}</div>`;
 const notifV = () => { const nf = unreadForum(), al = alerts();
-  return `<div class="card"><h3>🔔 Notifications</h3>${nf ? `<div class="row" onclick="A.go('forum')"><b>💬 ${nf} nouvelle(s) publication(s) dans le forum</b><small>Toucher pour lire</small></div>` : ""}${al.map(e => `<div class="row" onclick="A.go('fiche','${e.id}')"><b>${NEWA.includes(e.id) ? "🆕 " : ""}${esc(e.nom)}</b><small>Mortalité ${mort(e).toFixed(1)} % (> 5 %) · ${esc(e.ville)}</small></div>`).join("")}${!nf && !al.length ? "<p class='mut'>Aucune notification.</p>" : ""}</div>`; };
+  return (isStaff() ? visNotif() : "") + `<div class="card"><h3>🔔 Notifications</h3>${nf ? `<div class="row" onclick="A.go('forum')"><b>💬 ${nf} nouvelle(s) publication(s) dans le forum</b><small>Toucher pour lire</small></div>` : ""}${al.map(e => `<div class="row" onclick="A.go('fiche','${e.id}')"><b>${NEWA.includes(e.id) ? "🆕 " : ""}${esc(e.nom)}</b><small>Mortalité ${mort(e).toFixed(1)} % (> 5 %) · ${esc(e.ville)}</small></div>`).join("")}${!nf && !al.length ? "<p class='mut'>Aucune notification.</p>" : ""}</div>`; };
 const traceV = () => `<div class="card"><h3>🔎 Traçabilité</h3><label>Code de l'exploitation / lot<input id="tc"></label><button class="b g" onclick="A.go('fiche',$('#tc').value.trim())">Rechercher</button></div>`;
 const howV = () => `<div class="card"><h3>❓ Comment ça marche</h3><p>1. <b>Inscrivez</b> votre exploitation (élevage ou agriculture).<br>2. <b>Saisie</b> quotidienne : pertes, intrants, vaccins.<br>3. <b>Alertes</b> automatiques si mortalité anormale.<br>4. <b>National</b> : suivi cartographique et statistiques.<br>5. <b>Traçabilité</b> : QR code par exploitation.</p></div>`;
 const REAL = [["PC-INFORMATIQUE (ce site)","https://pcinformatique28-cloud.github.io/pc-informatique-site/","Sites, applications & PWA sur mesure"],["AMBI241","https://ambi2412026-debug.github.io/ambi241","Annuaire des bars, restos et boîtes de nuit"],["MAGERANTE","https://magerante241-boop.github.io/magerante/","Caisse et inventaire pour bars, snacks et clubs"],["MALAGA","https://malagagabon-dot.github.io/malaga-gabon/","Location immobilière à Libreville"],["Gabon Sport Connect","https://gabon-sport-connect.web.app","Clubs, fédérations et athlètes"],["LE WORK","https://lework63-2b761.web.app","Clients et techniciens validés"],["BIJOU","https://bijouesno1-bit.github.io/bijou/","Billetterie en ligne sécurisée"],["TROC MAISON","https://trocmaison106-rgb.github.io/troc-maison/","Petites annonces de troc"],["ANEG","https://pcinformatique28-cloud.github.io/aneg-gabon/","Annuaire national des églises"],["LAV","https://gabonlave-spec.github.io/lavegabon/","Laveurs et laveuses au Gabon"]];
@@ -294,13 +299,13 @@ const aboutV = () => `<div class="card"><h3>🌱 Neoferme</h3><p><b>De la ferme 
 <div class="card"><h3>🏢 Le studio PC-INFORMATIQUE</h3><p>Studio de développement basé à Libreville, Gabon, spécialisé dans la création de sites, d'applications et de PWA sur mesure pour les entreprises et les particuliers gabonais.</p><a class="lk" href="https://pcinformatique28-cloud.github.io/pc-informatique-site/" target="_blank" rel="noopener">Visiter le site du studio</a></div>
 <div class="card"><h3>📁 Nos réalisations</h3>${REAL.map((r, i) => `<a class="row" href="${r[1]}" target="_blank" rel="noopener"><b>${i + 1}. ${r[0]}</b><small>${r[2]}</small></a>`).join("")}<div class="row"><b>11. Neoferme</b><small>Suivi des fermes et traçabilité agricole · vous êtes ici</small></div></div>
 <div class="card"><h3>📞 Contact</h3><a class="row" href="mailto:pcinformatique28@gmail.com"><b>✉️ pcinformatique28@gmail.com</b></a><a class="row" href="tel:+24160141924"><b>📞 +241 60 14 19 24</b></a><a class="row" href="https://wa.me/24160141924" target="_blank" rel="noopener"><b>💬 WhatsApp</b></a></div>
-<div class="card"><h3>⚖️ Mentions légales</h3><p class="mut"><b>Éditeur :</b> PC-INFORMATIQUE, studio de développement, Libreville, Gabon.<br><b>Données :</b> les informations saisies servent uniquement au fonctionnement de l'application et au suivi des exploitations. Elles sont hébergées via Firebase (Authentification, Firestore).</p></div>`;
+<div class="card"><h3>⚖️ Mentions légales</h3><p class="mut"><b>Éditeur :</b> PC-INFORMATIQUE, studio de développement, Libreville, Gabon.<br><b>Données :</b> les informations saisies servent uniquement au fonctionnement de l'application et au suivi des exploitations. Elles sont hébergées via Firebase (Authentification, Firestore).<br><b>Statistiques de visite :</b> à chaque session, le pays et la ville approximatifs (déduits de l'adresse IP via le service ipwho.is, l'adresse IP n'étant pas conservée), le type d'appareil, la page et l'heure sont enregistrés pour des statistiques et la sécurité. Ces données ne sont consultables que par les administrateurs.</p></div>`;
 
 // ---- administration : synthèses et exports ----
 function group(k) { const o = {}; EX.forEach(e => { const g = o[k(e)] ||= { n: 0, eff: 0, surf: 0, prod: 0 }; g.n++; g.eff += num(e.effectif); g.surf += num(e.surface); g.prod += num(e.production); }); return o; }
 const tbl = (t, o) => { const r = Object.entries(o), s = f => r.reduce((a, [, g]) => a + g[f], 0);
   return `<h4>${t}</h4><table><tr><th>${t.split(" ").pop()}</th><th>Expl.</th><th>Effectif</th><th>Surf. ha</th><th>Prod. kg</th></tr>${r.map(([k, g]) => `<tr><td>${esc(k)}</td><td>${g.n}</td><td>${g.eff}</td><td>${g.surf.toFixed(1)}</td><td>${g.prod}</td></tr>`).join("")}<tr class="tot"><td>TOTAL</td><td>${s("n")}</td><td>${s("eff")}</td><td>${s("surf").toFixed(1)}</td><td>${s("prod")}</td></tr></table>`; };
-function adminV() {
+function synthV() {
   return `<div class="card noprint"><h3>🛠️ Administration</h3><button class="b g" onclick="print()">🖨️ Imprimer / enregistrer en PDF</button><button class="b n" onclick="A.csv()">📄 Export CSV (Excel)</button><p class="mut">Pour un PDF : Imprimer → « Enregistrer au format PDF ».</p></div>${demoCard()}
 <div class="card" id="print"><h3>Neoferme — Synthèse nationale (${new Date().toLocaleDateString("fr-FR")})</h3>${tbl("Synthèse par catégorie", group(e => e.secteur + " / " + e.categorie))}${tbl("Synthèse par province", group(e => e.province))}
 <h4>Fiches individuelles</h4><table><tr><th>Nom</th><th>Catégorie</th><th>Lieu</th><th>Eff.</th><th>Mort. %</th><th class="noprint">Action</th></tr>${EX.map(e => `<tr onclick="A.go('fiche','${e.id}')"><td>${esc(e.nom)} ${dem(e)}</td><td>${esc(e.categorie)}</td><td>${esc(e.ville)}</td><td>${e.effectif || ""}</td><td>${mort(e).toFixed(1)}</td><td class="noprint"><button class="mini" onclick="event.stopPropagation();A.adel('${e.id}')">🗑️</button></td></tr>`).join("")}</table></div>`;
@@ -632,6 +637,58 @@ window.ephInstall = () => ephAdd("ins");
 window.addEventListener("appinstalled", () => A.epx("ins", 1));
 setTimeout(() => { EPH_ON = true; ephAdd("how"); ephAdd("ins"); }, document.getElementById("splash") ? 9200 : 1800);
 
+
+// ---- tracking des connexions (admin) ----
+let atab = "synth", VIS = [], TF = { t: "", q: "" }, PREV = 0, SEEN = 0, unsub = null;
+const dev = () => { const u = navigator.userAgent; return (/Tablet|iPad/i.test(u) ? "Tablette" : /Mobi|Android|iPhone/i.test(u) ? "Mobile" : "Ordinateur") + " · " + (/Edg/.test(u) ? "Edge" : /OPR|Opera/.test(u) ? "Opera" : /Chrome/.test(u) ? "Chrome" : /Firefox/.test(u) ? "Firefox" : /Safari/.test(u) ? "Safari" : "Autre"); };
+async function track() {
+  try {
+    if (!navigator.onLine) return; const key = "nf_t_" + (U ? U.uid : "v"); if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1");
+    let vid = localStorage.getItem("nf_vid"); if (!vid) { vid = crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2); localStorage.setItem("nf_vid", vid); }
+    let g = {}; try { const c = new AbortController(); setTimeout(() => c.abort(), 4000); g = await (await fetch("https://ipwho.is/", { signal: c.signal })).json(); } catch (e) {}
+    const L = (x, n = 60) => String(x || "").slice(0, n), d = { type: U ? ROLE : "visiteur", nom: L(U ? NOM || "Membre" : "Visiteur"), pays: L(g.country || "Inconnu"), ville: L(g.city || "Inconnue"), region: L(g.region), appareil: L(dev()), page: L(view, 20), vid: L(vid, 40), ts: Date.now() };
+    if (U) d.uid = U.uid;
+    await addDoc(collection(db, "visites"), d);
+  } catch (e) {}
+}
+const adminV = () => `<div class="card noprint tabs"><button class="${atab === "synth" ? "on" : ""}" onclick="A.atab('synth')">📊 Synthèses</button><button class="${atab === "track" ? "on" : ""}" onclick="A.atab('track')">📡 Tracking<i id="bt" class="bd">${newVis() || ""}</i></button></div>` + (atab === "track" ? trackV() : synthV());
+A.atab = async t => { atab = t; if (t === "track") { PREV = SEEN; if (!unsub) await loadVis(); markSeen(); } render(); };
+async function loadVis() { try { VIS = (await getDocs(query(collection(db, "visites"), orderBy("ts", "desc"), limit(300)))).docs.map(d => ({ id: d.id, ...d.data() })); } catch (e) { VIS = []; } }
+const visF = () => VIS.filter(v => (!TF.t || v.type === TF.t) && (!TF.q || norm([v.nom, v.pays, v.ville, v.region, v.page, v.appareil].join(" ")).includes(norm(TF.q))));
+const topN = (l, k) => { const o = {}; l.forEach(v => { const x = v[k] || "Inconnu"; o[x] = (o[x] || 0) + 1; }); return Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([x, n]) => `${esc(x)} (${n})`).join(", ") || "–"; };
+const statsV = () => { const l = visF(); return `<p><b>${l.length}</b> session(s) · <b>${new Set(l.map(v => v.vid)).size}</b> appareil(s) unique(s) · <b>${l.filter(v => v.type !== "visiteur").length}</b> membre(s) · <b>${l.filter(v => v.type === "visiteur").length}</b> visiteur(s)<br>Pays : ${topN(l, "pays")}<br>Villes : ${topN(l, "ville")}</p>`; };
+const rowsV = () => visF().map(v => `<tr class="${v.ts > PREV && v.uid !== U?.uid ? "nw" : ""}"><td>${new Date(v.ts).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</td><td>${v.ts > PREV && v.uid !== U?.uid ? "🆕 " : ""}${esc(v.nom)}</td><td>${esc(v.type)}</td><td>${esc(v.pays)}</td><td>${esc(v.ville)}</td><td>${esc(v.appareil)}</td></tr>`).join("") || '<tr><td colspan="6">Aucune donnée</td></tr>';
+function trackV() {
+  const types = [...new Set(VIS.map(v => v.type))];
+  return `<div class="card noprint"><h3>📡 Tracking des connexions</h3><button class="b n" onclick="A.atab('track')">🔄 Actualiser</button><button class="b g" onclick="print()">🖨️ Imprimer / PDF</button><button class="b n" onclick="A.vcsv()">📄 Export CSV</button>
+<label>Type<select id="tt1" onchange="A.tf()"><option value="">Tous</option>${types.map(t => `<option ${t === TF.t ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+<label>Recherche (nom, pays, ville…)<input id="tq" value="${esc(TF.q)}" oninput="A.tf()"></label><p class="mut">300 dernières sessions. Données approximatives (pays/ville déduits de l'adresse IP).</p></div>
+<div class="card" id="print"><h3>Tracking des connexions — ${new Date().toLocaleDateString("fr-FR")}</h3><div id="tk">${statsV()}</div><div class="scr"><table><tr><th>Heure</th><th>Nom</th><th>Type</th><th>Pays</th><th>Ville</th><th>Appareil</th></tr><tbody id="tt">${rowsV()}</tbody></table></div></div>`;
+}
+A.tf = () => { TF.t = $("#tt1").value; TF.q = $("#tq").value; $("#tk").innerHTML = statsV(); $("#tt").innerHTML = rowsV(); };
+A.vcsv = () => { const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`, r = visF().map(v => [new Date(v.ts).toLocaleString("fr-FR"), v.nom, v.type, v.pays, v.region, v.ville, v.appareil, v.page].map(q).join(";"));
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + ["date", "nom", "type", "pays", "region", "ville", "appareil", "page"].join(";") + "\n" + r.join("\n")], { type: "text/csv" })); a.download = "neoferme-tracking.csv"; a.click(); };
+
+const newVis = () => U && isStaff() ? VIS.filter(v => v.ts > SEEN && v.uid !== U.uid).length : 0;
+function markSeen() { SEEN = VIS.reduce((m, v) => Math.max(m, v.ts || 0), SEEN); try { localStorage.nf_seen = SEEN; } catch (e) {} updBadges(); }
+function updBadges() { const n = newVis(), t = $("#bt"); if (t) t.textContent = n || ""; document.querySelectorAll(".nbt").forEach(x => x.textContent = n || ""); updBell(); const nv = $("#nav"); if (nv && U) nv.innerHTML = navH(); }
+function watchVis() {
+  if (unsub) { unsub(); unsub = null; } VIS = [];
+  if (!U || !isStaff()) return;
+  try { if (!localStorage.nf_seen) localStorage.nf_seen = Date.now(); SEEN = +localStorage.nf_seen || 0; } catch (e) {}
+  unsub = onSnapshot(query(collection(db, "visites"), orderBy("ts", "desc"), limit(300)), snap => {
+    VIS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (view === "admin" && atab === "track" && $("#tt")) { markSeen(); $("#tk").innerHTML = statsV(); $("#tt").innerHTML = rowsV(); }
+    else { updBadges(); if (view === "notif") render(); }
+  }, () => {});
+}
+const visNotif = () => { const l = VIS.filter(v => v.ts > SEEN && v.uid !== U.uid); if (!l.length) return "";
+  return `<div class="card"><h3>📡 Nouvelles connexions <span class="bd">${l.length || ""}</span></h3>${l.slice(0, 10).map(v => `<div class="row"><b>${esc(v.nom)} · ${esc(v.type)}</b><small>${esc(v.ville)}, ${esc(v.pays)} · ${new Date(v.ts).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</small></div>`).join("") || "<p class='mut'>Aucune nouvelle connexion.</p>"}<button class="b n" onclick="A.go('admin');A.atab('track')">Ouvrir le tracking</button>${l.length ? '<button class="b g" onclick="A.seen()">✔️ Marquer comme vu</button>' : ""}</div>`; };
+A.seen = () => { markSeen(); render(); };
+A.trk = () => { A.go("admin"); A.atab("track"); };
+
+initStatus(db);
+window.addEventListener("online", async () => { try { await load(); if (["home", "fermes", "national", "trace", "notif"].includes(view)) render(); } catch (e) {} });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 
 /* Oeil afficher/masquer mot de passe */

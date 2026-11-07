@@ -1,8 +1,9 @@
 import { getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, setDoc, getDocs, doc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, query, where, onSnapshot, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 await new Promise(r => { const t = setInterval(() => { try { getApp(); clearInterval(t); r(); } catch (e) {} }, 300); });
+import { addDoc, updateDoc, deleteDoc, setDoc, getDocs, getDoc } from "./offline.js";
 const auth = getAuth(), db = getFirestore(), COL = "alertes_maladie";
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
