@@ -221,7 +221,7 @@ A.saisie = async () => { try { await addDoc(collection(db, "saisies"), { uid: U.
 // ---- national / notifs / divers ----
 const byProv = () => { const o = {}; EX.forEach(e => (o[e.province] ||= []).push(e)); return o; };
 const nationalV = () => `<div id="map" class="map"></div><div class="card"><h3>Mortalité moyenne par province (%)</h3>${Object.entries(byProv()).map(([p, l]) => { const m = l.reduce((a, e) => a + mort(e), 0) / l.length; return `<div class="bar"><span>${esc(p)}</span><i style="width:${Math.min(m * 10, 100)}%"></i><b>${m.toFixed(1)}</b></div>`; }).join("") || "<p class='mut'>Pas encore de données.</p>"}</div>`;
-const notifV = () => (isStaff() ? visNotif() : "") + `<div class="card"><h3>🔔 Alertes</h3>${alerts().map(e => `<div class="row" onclick="A.go('fiche','${e.id}')"><b>${esc(e.nom)}</b><small>Mortalité ${mort(e).toFixed(1)} % (> 5 %) · ${esc(e.ville)}</small></div>`).join("") || "<p class='mut'>Aucune alerte.</p>"}</div>`;
+const notifV0 = () => (isStaff() ? visNotif() : "") + `<div class="card"><h3>🔔 Alertes</h3>${alerts().map(e => `<div class="row" onclick="A.go('fiche','${e.id}')"><b>${esc(e.nom)}</b><small>Mortalité ${mort(e).toFixed(1)} % (> 5 %) · ${esc(e.ville)}</small></div>`).join("") || "<p class='mut'>Aucune alerte.</p>"}</div>`;
 const traceV = () => `<div class="card"><h3>🔎 Traçabilité</h3><label>Code de l'exploitation / lot<input id="tc"></label><button class="b g" onclick="A.go('fiche',$('#tc').value.trim())">Rechercher</button></div>`;
 const howV = () => `<div class="card"><h3>❓ Comment ça marche</h3><p>1. <b>Inscrivez</b> votre exploitation (élevage ou agriculture).<br>2. <b>Saisie</b> quotidienne : pertes, intrants, vaccins.<br>3. <b>Alertes</b> automatiques si mortalité anormale.<br>4. <b>National</b> : suivi cartographique et statistiques.<br>5. <b>Traçabilité</b> : QR code par exploitation.</p></div>`;
 const REAL = [["PC-INFORMATIQUE (ce site)","https://pcinformatique28-cloud.github.io/pc-informatique-site/","Sites, applications & PWA sur mesure"],["AMBI241","https://ambi2412026-debug.github.io/ambi241","Annuaire des bars, restos et boîtes de nuit"],["MAGERANTE","https://magerante241-boop.github.io/magerante/","Caisse et inventaire pour bars, snacks et clubs"],["MALAGA","https://malagagabon-dot.github.io/malaga-gabon/","Location immobilière à Libreville"],["Gabon Sport Connect","https://gabon-sport-connect.web.app","Clubs, fédérations et athlètes"],["LE WORK","https://lework63-2b761.web.app","Clients et techniciens validés"],["BIJOU","https://bijouesno1-bit.github.io/bijou/","Billetterie en ligne sécurisée"],["TROC MAISON","https://trocmaison106-rgb.github.io/troc-maison/","Petites annonces de troc"],["ANEG","https://pcinformatique28-cloud.github.io/aneg-gabon/","Annuaire national des églises"],["LAV","https://gabonlave-spec.github.io/lavegabon/","Laveurs et laveuses au Gabon"]];
@@ -279,7 +279,12 @@ A.vcsv = () => { const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`, r = 
 
 const newVis = () => U && isStaff() ? VIS.filter(v => v.ts > SEEN && v.uid !== U.uid).length : 0;
 function markSeen() { SEEN = VIS.reduce((m, v) => Math.max(m, v.ts || 0), SEEN); try { localStorage.nf_seen = SEEN; } catch (e) {} updBadges(); }
-function updBadges() { const n = newVis(), a = alerts().length + n, b = $("#badge"), t = $("#bt"); if (b) b.textContent = a > 99 ? "99+" : a || ""; if (t) t.textContent = n || ""; document.querySelectorAll(".nbt").forEach(x => x.textContent = n || ""); }
+function updBadges() { const n = newVis(), a = newAlerts().length + n, b = $("#badge"), t = $("#bt"); if (b) b.textContent = a > 99 ? "99+" : a || ""; if (t) t.textContent = n || ""; document.querySelectorAll(".nbt").forEach(x => x.textContent = n || ""); }
+let ASEEN = []; try { ASEEN = JSON.parse(localStorage.nf_aseen || "[]"); } catch (e) {}
+const akey = e => e.id + ":" + Math.floor(mort(e));
+const newAlerts = () => alerts().filter(e => !ASEEN.includes(akey(e)));
+function markAlertsSeen() { ASEEN = alerts().map(akey); try { localStorage.nf_aseen = JSON.stringify(ASEEN); } catch (e) {} updBadges(); }
+const notifV = () => { setTimeout(markAlertsSeen, 0); return notifV0(); };
 function watchVis() {
   if (unsub) { unsub(); unsub = null; } VIS = [];
   if (!U || !isStaff()) return;
