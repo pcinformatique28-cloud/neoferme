@@ -67,11 +67,11 @@ onAuthStateChanged(auth, async u => {
 // ---- navigation ----
 const canForum = () => !!U && ["admin", "eleveur", "agriculteur"].includes(ROLE);
 const PUB = [["home", "🏠", "Accueil"], ["forum", "💬", "Forum"], ["how", "❓", "Aide"], ["about", "ℹ️", "À propos"], ["login", "🔑", "Connexion"]];
-const TABS = [["home", "🏠", "Accueil"], ["saisie", "✍️", "Saisie"], ["fermes", "🌾", "Exploitations"], ["national", "📊", "National"], ["trace", "🔎", "Traçabilité"], ["forum", "💬", "Forum"]];
+const TABS = [["home", "🏠", "Accueil"], ["saisie", "✍️", "Saisie"], ["fermes", "🌾", "Exploitations"], ["national", "📊", "National"], ["trace", "🔎", "Traçabilité"], ["forum", "💬", "Forum"], ["reseau", "🤝", "Réseau"]];
 const tabs = () => TABS;
 A.go = (v, id) => { if (!U && !["home", "forum", "membre", "how", "about", "login"].includes(v)) v = "login"; view = v; cur = id || null; $("#drawer").classList.remove("open"); window.scrollTo(0, 0); render(); };
 A.menu = () => {
-  const top = U ? [["home", "🏠", "Accueil"], ["profil", "👤", "Mon profil"], ["forum", "💬", "Forum"], ["notif", "🔔", "Notifications"], ["fermes", "🌾", "Exploitations"], ["saisie", "✍️", "Saisie"], ["national", "📊", "National"], ["trace", "🔎", "Traçabilité"]]
+  const top = U ? [["home", "🏠", "Accueil"], ["profil", "👤", "Mon profil"], ["forum", "💬", "Forum"], ["reseau", "🤝", "Réseau"], ["notif", "🔔", "Notifications"], ["fermes", "🌾", "Exploitations"], ["saisie", "✍️", "Saisie"], ["national", "📊", "National"], ["trace", "🔎", "Traçabilité"]]
     : [["home", "🏠", "Accueil"], ["forum", "💬", "Forum"], ["login", "🔑", "Connexion"]];
   if (isStaff()) top.push(["admin", "🛠️", "Administration"]);
   if (ROLE === "admin") top.push(["trk", "📡", "Tracking"]);
@@ -92,7 +92,7 @@ function render() {
   const main = $("#main");
   if (!U && !["home", "forum", "membre", "how", "about"].includes(view)) view = "login";
   if (!U && view === "login") { main.innerHTML = loginV(); return; }
-  main.innerHTML = ({ home: homeV, saisie: saisieV, fermes: fermesV, national: nationalV, trace: traceV, notif: notifV, how: howV, about: aboutV, admin: adminV, fiche: ficheV, nouveau: nouveauV, forum: forumV, profil: profilV, membre: membreV }[view] || homeV)();
+  main.innerHTML = ({ home: homeV, saisie: saisieV, fermes: fermesV, national: nationalV, trace: traceV, notif: notifV, how: howV, about: aboutV, admin: adminV, fiche: ficheV, nouveau: nouveauV, forum: forumV, profil: profilV, membre: membreV, reseau: () => A.reseauV() }[view] || homeV)();
   if (view === "home" || view === "national") initMap();
   if (view === "nouveau") { A.sect(); A.pre(); }
   if (view === "forum") A.fload();
@@ -441,7 +441,7 @@ const profilV = () => `<div class="card"><h3>👤 Mon profil</h3>
 <button class="b n" onclick="$('#pfile').click()">📷 ${okImg(UP) ? "Changer" : "Ajouter"} ma photo</button>${okImg(UP) ? `<button class="b n" onclick="A.prm()">🗑️ Retirer ma photo</button>` : ""}
 <p class="mut">${esc(U.email)} · Rôle : <b>${esc(ROLE)}</b></p><p id="pmsg" class="err"></p></div>
 ${blk("Mes informations", "prof", PRF)}
-<button class="b g" onclick="A.psave()">Enregistrer mon profil</button><p id="msg" class="err"></p>
+${A.domV ? A.domV() : ""}<button class="b g" onclick="A.psave()">Enregistrer mon profil</button><p id="msg" class="err"></p>
 <div class="card" id="gal"><p class="mut cr">Chargement de la galerie…</p></div>`;
 A.ppre = () => { document.querySelectorAll('.x[data-g="prof"]').forEach(i => { i.value = UPF[i.dataset.k] || ""; }); A.gload(); };
 const sq = (f, n = 400) => new Promise(res => {
@@ -868,3 +868,124 @@ A.demoOn = async () => {
     await load(); render(); const m2 = $("#dmsg"); if (m2) m2.textContent = "✅ " + n + " exploitation(s) démo ajoutée(s).";
   } catch (x) { m.textContent = "Erreur sur « " + (todo[n] ? todo[n].nom : "?") + " » : " + (x.code || x.message); }
 };
+
+// ================= RÉSEAU + DOMAINE + MENU (v1.3) =================
+(() => {
+  const rz = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const SEGS = ["Agriculteurs", "Éleveurs", "Autres"];
+  const DOMS = ["Éleveur", "Agriculteur", "Agro-éleveur (mixte)", "Pisciculteur", "Apiculteur", "Transformateur", "Autre"];
+  let RN = { list: [], loaded: false, err: "", init: false }, RF = { seg: "", prov: "", ville: "", q: "", n: 30 };
+  const memCode = () => "NF-" + String(U.uid).slice(0, 6).toUpperCase();
+  const myEx = () => U ? EX.filter(e => e.uid === U.uid && !e.demo) : [];
+  const fm = (v, d) => Number(v).toLocaleString("fr-FR", { maximumFractionDigits: d });
+  const segOf = (profil, exs) => { const s = new Set(), p = rz(profil);
+    if (/agri|agro/.test(p)) s.add("Agriculteurs"); if (/eleveur|elevage|agro|mixte/.test(p)) s.add("Éleveurs"); if (/pisci|apicul|transform|autre/.test(p)) s.add("Autres");
+    exs.forEach(e => s.add(e.secteur === "Agriculture" ? "Agriculteurs" : e.secteur === "Élevage" ? "Éleveurs" : "Autres"));
+    if (!s.size) s.add("Autres"); return [...s]; };
+  const mySeg = () => { const ex = myEx(); return !UPF.profil && !ex.length ? "" : segOf(UPF.profil, ex)[0]; };
+  const myProv = () => UPF.prov || (myEx()[0] && myEx()[0].province) || "";
+  const mkM = (id, p, exs) => {
+    const provs = new Set([p.prov, ...exs.map(e => e.province)].filter(Boolean)), villes = new Set([p.ville, ...exs.map(e => e.ville)].filter(Boolean));
+    const prods = [...new Set([...(Array.isArray(p.produits) ? p.produits : []), ...exs.map(e => e.categorie)].filter(Boolean))];
+    const vars = String(p.varietes || "").split(",").map(x => x.trim()).filter(Boolean);
+    return { id, nom: p.nom || "Membre", photo: p.photo || "", profil: p.profil || "", prov: p.prov || (exs[0] && exs[0].province) || "", ville: p.ville || (exs[0] && exs[0].ville) || "",
+      provs, villes, prods, vars, exs, demo: !!(p.demo || (exs.length && exs.every(e => e.demo))), segs: segOf(p.profil, exs), me: !!U && id === U.uid,
+      blob: rz([p.nom, p.profil, p.varietes, ...prods, ...exs.map(e => [e.nom, e.quartier, e.village, e.ville, e.province].join(" "))].join(" ")) };
+  };
+  const netMembers = () => {
+    const own = pid => EX.filter(e => (e.profilId ? e.profilId === pid : e.uid === pid)), M = new Map();
+    RN.list.forEach(p => M.set(p.id, mkM(p.id, p, own(p.id))));
+    EX.forEach(e => { const id = e.profilId || e.uid; if (id && !M.has(id)) M.set(id, mkM(id, { nom: e.nom, prov: e.province, ville: e.ville }, own(id))); });
+    return [...M.values()];
+  };
+  const aggM = exs => { const a = { prod: 0, surf: 0, eff: 0, rend: 0 }, ag = exs.filter(e => e.secteur === "Agriculture"), el = exs.filter(e => e.secteur === "Élevage");
+    a.prod = exs.reduce((t, e) => t + num(e.production), 0); a.surf = ag.reduce((t, e) => t + num(e.surface), 0); a.eff = el.reduce((t, e) => t + num(e.effectif), 0);
+    const ps = ag.reduce((t, e) => t + num(e.production), 0); if (ps > 0 && a.surf > 0) a.rend = ps / 1000 / a.surf; return a; };
+  const CMP = [["prod", "Production annuelle", "kg/an", 0], ["rend", "Rendement agricole", "t/ha", 2], ["eff", "Effectif animal", "têtes", 0], ["surf", "Surface cultivée", "ha", 1]];
+  const rFiltered = () => netMembers().filter(m => (!RF.seg || m.segs.includes(RF.seg)) && (!RF.prov || m.provs.has(RF.prov)) && (!RF.ville || m.villes.has(RF.ville)) && (!RF.q || m.blob.includes(rz(RF.q))));
+  const rCmp = peers => {
+    const mine = aggM(myEx());
+    const rows = CMP.filter(c => mine[c[0]] > 0).map(c => {
+      const mv = mine[c[0]], v = peers.map(m => aggM(m.exs)[c[0]]).filter(x => x > 0);
+      if (v.length < 3) return `<div class="cmpr"><div class="t"><b>${c[1]}</b><span>Vous : <b>${fm(mv, c[3])}</b> ${c[2]}</span></div><small class="mut">Pas assez de profils comparables (3 minimum).</small></div>`;
+      const avg = v.reduce((a, x) => a + x, 0) / v.length, lo = Math.min(...v, mv), hi = Math.max(...v, mv), pos = hi > lo ? (mv - lo) / (hi - lo) * 100 : 50, rk = v.filter(x => x > mv).length + 1, d = (mv - avg) / avg * 100;
+      return `<div class="cmpr"><div class="t"><b>${c[1]}</b><span>Vous : <b>${fm(mv, c[3])}</b> ${c[2]}</span></div><div class="cmp"><i style="left:${pos.toFixed(0)}%"></i></div>
+<div class="t"><small>min ${fm(lo, c[3])}</small><small>moyenne ${fm(avg, c[3])}</small><small>max ${fm(hi, c[3])}</small></div><small>${d >= 0 ? "▲ +" : "▼ "}${d.toFixed(0)} % vs moyenne · rang ${rk}/${v.length + 1}</small></div>`;
+    });
+    return `<div class="card"><h3>📊 Ma position</h3>${rows.join("") || "<p class='mut'>Renseignez la production, la surface ou l'effectif d'une de vos exploitations pour vous comparer.</p>"}<p class="mut">Comparaison anonyme avec les membres du filtre actif (${peers.length}) : seules des statistiques d'ensemble sont affichées.</p></div>`;
+  };
+  const rowM = m => { const lieu = [m.ville, m.prov].filter(Boolean).join(", "), tags = [...m.prods, ...m.vars].slice(0, 5).join(" · ");
+    return `<div class="rm" onclick="A.go('membre','${esc(m.id)}')">${avs(m.photo, m.nom)}<div class="pi"><b>${esc(m.nom)} ${dem(m)}</b><small>${esc(m.profil || m.segs.join(" / "))}${lieu ? " · " + esc(lieu) : ""}</small>${tags ? `<small>${esc(tags)}</small>` : ""}<small>${m.exs.length} exploitation(s)</small></div></div>`; };
+  const rdraw = () => {
+    const fp = $("#rfp"); if (!fp) return;
+    const pv = Object.keys(PROVINCES), vl = RF.prov && PROVINCES[RF.prov] ? Object.keys(PROVINCES[RF.prov].villes) : [];
+    const op = (l, s, ph) => `<option value="">${ph}</option>` + l.map(x => `<option${x === s ? " selected" : ""}>${esc(x)}</option>`).join("");
+    fp.innerHTML = `<div class="net-ch">${["", ...SEGS].map(s => `<button class="${RF.seg === s ? "on" : ""}" onclick="A.rf('seg','${s}')">${s || "Tous"}</button>`).join("")}</div>
+<label>Province<select onchange="A.rf('prov',this.value)">${op(pv, RF.prov, "Toutes les provinces")}</select></label>
+<label>Ville / commune<select onchange="A.rf('ville',this.value)">${op(vl, RF.ville, RF.prov ? "Toutes les villes" : "Choisir d'abord une province")}</select></label>
+<button class="b n" onclick="A.rme()">🎯 Profils semblables aux miens</button><button class="b n" onclick="A.rreset()">✕ Réinitialiser les filtres</button>`;
+    const peers = rFiltered().filter(m => !m.me), c = $("#rcmp"); if (c) c.innerHTML = U ? rCmp(peers) : "";
+    const mp = myProv(), mv = (myEx()[0] || {}).ville || UPF.ville || "", sc = m => m.villes.has(mv) ? 0 : m.provs.has(mp) ? 1 : 2;
+    const list = peers.slice().sort((a, b) => sc(a) - sc(b) || a.nom.localeCompare(b.nom)), l = $("#rlist"); if (!l) return;
+    l.innerHTML = `<div class="card"><b>${list.length} profil(s)</b>${RN.err ? `<p class="err">Annuaire partiel (${esc(RN.err)}) : seuls les membres ayant une exploitation apparaissent.</p>` : ""}${list.slice(0, RF.n).map(rowM).join("") || "<p class='mut'>Aucun profil pour ces filtres.</p>"}${list.length > RF.n ? `<button class="b n" onclick="A.rmore()">Afficher plus</button>` : ""}</div>`;
+  };
+  A.reseauV = () => { setTimeout(() => A.rload(), 0); return `<div class="card"><h3>🤝 Réseau des acteurs</h3><p class="mut">Retrouvez et visitez les autres agriculteurs, éleveurs et acteurs du domaine.</p><div id="rfp"></div><label>Recherche (nom, village, quartier, produit, espèce)<input id="rq" value="${esc(RF.q)}" oninput="A.rq(this.value)"></label></div><div id="rcmp"></div><div id="rlist"><p class="mut cr">Chargement…</p></div>`; };
+  A.rload = async () => {
+    if (!RN.init) { RN.init = true; const s = mySeg(); if (s) RF.seg = s; }
+    if (!RN.loaded) {
+      try { RN.list = (await getDocs(query(collection(db, "profils"), limit(400)))).docs.map(d => ({ id: d.id, ...d.data() })); RN.err = ""; } catch (e) { RN.list = []; RN.err = e.code || e.message; }
+      RN.loaded = true;
+      if (U && !RN.list.some(p => p.id === U.uid)) { try { await syncPub({ profil: UPF.profil || "", prov: UPF.prov || "", ville: UPF.ville || "" }); RN.list.push({ id: U.uid, uid: U.uid, nom: UN || who(), photo: UP, profil: UPF.profil || "", prov: UPF.prov || "", ville: UPF.ville || "" }); } catch (e) {} }
+    }
+    rdraw();
+  };
+  A.rf = (k, v) => { RF[k] = v; if (k === "prov") RF.ville = ""; RF.n = 30; rdraw(); };
+  A.rq = v => { RF.q = v.trim(); RF.n = 30; clearTimeout(A._rt); A._rt = setTimeout(rdraw, 250); };
+  A.rme = () => { RF.seg = mySeg(); RF.prov = myProv(); RF.ville = ""; RF.q = ""; RF.n = 30; const q = $("#rq"); if (q) q.value = ""; rdraw(); };
+  A.rreset = () => { RF = { seg: "", prov: "", ville: "", q: "", n: 30 }; const q = $("#rq"); if (q) q.value = ""; rdraw(); };
+  A.rmore = () => { RF.n += 30; rdraw(); };
+
+  // ---- domaine, produits, espèces (dans Mon profil) ----
+  const prodBoxes = () => Object.entries(SEC).map(([sec, cats]) => `<div class="blk"><h4>${esc(sec)}</h4>${Object.keys(cats).map(c => `<label class="chk"><input type="checkbox" class="pk" value="${esc(c)}"${(Array.isArray(UPF.produits) ? UPF.produits : []).includes(c) ? " checked" : ""}> ${esc(c)}</label>`).join("")}</div>`).join("");
+  A.domV = () => U ? `<div class="card"><h3>🔄 Mon domaine d'activité</h3>
+<p class="mut">Code membre : <b>${memCode()}</b> (ne change jamais)<br>Domaine actuel : <b>${esc(UPF.profil || "non renseigné")}</b></p>
+<label>Nouveau domaine<select id="dmn">${DOMS.map(d => `<option${d === UPF.profil ? " selected" : ""}>${esc(d)}</option>`).join("")}</select></label>
+<button class="b n" onclick="A.dchg()">🔄 Changer de domaine</button>
+<p class="mut">Vos exploitations, saisies, photos et identifiant sont conservés.</p>
+<h4>🌱 Mes produits et espèces</h4>${prodBoxes()}
+<label>Variétés / espèces précises (séparées par des virgules)<input id="dvar" value="${esc(UPF.varietes || "")}" placeholder="ex. manioc, banane plantain, poulets de chair"></label>
+<button class="b g" onclick="A.dprod()">🔄 Changer mes produits / espèces</button><p id="dm2" class="err"></p></div>` : "";
+  A.dchg = async () => {
+    const v = $("#dmn").value, old = UPF.profil || "", m = $("#dm2");
+    if (v === old) { m.textContent = "C'est déjà votre domaine actuel."; return; }
+    if (!confirm("Passer de « " + (old || "non renseigné") + " » à « " + v + " » ? Vos exploitations et vos données sont conservées.")) return;
+    const h = [...(Array.isArray(UPF.domaineHist) ? UPF.domaineHist : []), { de: old, vers: v, ts: Date.now() }].slice(-20);
+    try { await setDoc(doc(db, "users", U.uid), { profil: v, domaineHist: h }, { merge: true }); UPF = { ...UPF, profil: v, domaineHist: h }; await syncPub({ profil: v }); RN.loaded = false; RN.init = false; render();
+      const n = $("#dm2"); if (n) { n.style.color = "#1a7f37"; n.textContent = "✅ Domaine changé : " + v; } } catch (x) { m.textContent = x.code || x.message; }
+  };
+  A.dprod = async () => {
+    const m = $("#dm2"), prods = [...document.querySelectorAll(".pk:checked")].map(i => i.value), vr = $("#dvar").value.trim().slice(0, 200);
+    try { await setDoc(doc(db, "users", U.uid), { produits: prods, varietes: vr }, { merge: true }); UPF = { ...UPF, produits: prods, varietes: vr }; await syncPub({ produits: prods, varietes: vr }); RN.loaded = false; m.style.color = "#1a7f37"; m.textContent = "✅ Produits / espèces mis à jour."; }
+    catch (x) { m.style.color = ""; m.textContent = x.code || x.message; }
+  };
+
+  // ---- menu latéral : un seul bouton de déconnexion, Alertes maladie juste avant ----
+  const fixMenu = () => {
+    const d = document.querySelector("#drawer"); if (!d) return;
+    const tx = a => a.textContent.replace(/\s+/g, " ").trim(), els = [...d.querySelectorAll("a, button")];
+    const out = els.filter(a => /d[ée]connexion|se d[ée]connecter/i.test(tx(a)) && /out\(/.test(a.getAttribute("onclick") || ""));
+    let keep = null;
+    if (out.length) { keep = out.find(a => /se d[ée]connecter/i.test(tx(a))) || out[0]; out.forEach(a => { if (a !== keep) a.remove(); }); }
+    const al = els.find(a => a.isConnected && /alertes? maladie/i.test(tx(a)));
+    if (keep && al && al !== keep && keep.previousElementSibling !== al && keep.parentNode === al.parentNode) keep.parentNode.insertBefore(al, keep);
+  };
+  const dr = document.querySelector("#drawer"); if (dr) { let t; new MutationObserver(() => { clearTimeout(t); t = setTimeout(fixMenu, 30); }).observe(dr, { childList: true, subtree: true }); }
+
+  // ---- styles ----
+  const st = document.createElement("style");
+  st.textContent = `.net-ch{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:8px 0}.net-ch button{padding:8px 12px;border:0;border-radius:18px;background:#eaf0fd;color:#0b1f4d;font-weight:700;font-size:13px}.net-ch button.on{background:#0b1f4d;color:#fff}
+.rm{display:flex;align-items:center;gap:12px;text-align:left;padding:10px 12px;margin:8px 0;border:1px solid #dfe6f2;border-radius:12px;background:#fff}.rm .pi{display:flex;flex-direction:column;min-width:0}.rm small{color:#667}
+.cmpr{margin:14px 0;text-align:left}.cmpr .t{display:flex;justify-content:space-between;gap:8px;font-size:13px}.cmp{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,#f3c9c9,#fff3c4,#c9ecd3);margin:8px 0}.cmp i{position:absolute;top:-4px;width:6px;height:18px;border-radius:3px;background:#0b1f4d;transform:translateX(-3px)}
+#nav{display:flex!important;overflow-x:auto!important;scrollbar-width:none}#nav::-webkit-scrollbar{display:none}#nav a{flex:1 0 auto!important;min-width:66px!important}`;
+  document.head.appendChild(st);
+})();
