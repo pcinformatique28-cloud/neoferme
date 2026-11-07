@@ -1,15 +1,10 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b1f4d"><title>Neoferme · De la ferme à l'assiette</title>
-<meta name="description" content="Neoferme : suivi des exploitations agricoles et d'élevage du Gabon, carte nationale, traçabilité et forum.">
-<meta property="og:type" content="website"><meta property="og:site_name" content="Neoferme"><meta property="og:locale" content="fr_FR">
-<meta property="og:title" content="Neoferme — De la ferme à l'assiette"><meta property="og:description" content="Suivez vos exploitations, la carte nationale et la traçabilité, et échangez sur le forum. Partout au Gabon. 📞 +241 60 14 19 24">
-<meta property="og:url" content="https://pcinformatique28-cloud.github.io/neoferme/"><meta property="og:image" content="https://pcinformatique28-cloud.github.io/neoferme/assets/og-neoferme.jpg"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Neoferme — De la ferme à l'assiette"><meta name="twitter:image" content="https://pcinformatique28-cloud.github.io/neoferme/assets/og-neoferme.jpg">
-<link rel="preload" as="image" href="assets/accueil.jpg"><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="manifest" href="manifest.json"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,Roboto,sans-serif;background:#eef2f7;color:#0b1f4d;padding:46px 0 64px}
 header{position:fixed;top:0;left:0;right:0;height:46px;background:#0b1f4d;color:#fff;display:flex;align-items:center;gap:10px;padding:0 10px;z-index:1000;border-bottom:3px solid #fcd116}
 header b{font-size:17px;flex:1}header img{height:26px;background:#fff;border-radius:5px;padding:2px}header button{background:none;border:0;color:#fff;font-size:21px;position:relative}
-#badge{display:none;position:absolute;top:0;right:-2px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#e33;color:#fff;font-size:11px;font-style:normal;font-weight:700;align-items:center;justify-content:center;line-height:1;border:2px solid #0b1f4d}
+#badge{position:absolute;top:-2px;right:-6px;min-width:17px;height:17px;line-height:17px;padding:0 3px;border-radius:9px;background:#e33;color:#fff;font:700 11px sans-serif;font-style:normal;text-align:center}#badge:empty{display:none}
 .card{background:rgba(255,255,255,.9);margin:10px;padding:14px;border-radius:14px;box-shadow:0 1px 4px #0002}.card h3{margin:0 0 10px}
 .map{height:46vh;min-height:300px;z-index:1}.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px}
 .tile{background:rgba(255,255,255,.9);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:2px;box-shadow:0 1px 4px #0002;cursor:pointer}.tile:active{transform:scale(.97)}.tile span{font-size:22px}.tile b{font-size:22px}.tile small{color:#667}
@@ -24,15 +19,13 @@ nav{position:fixed;bottom:0;left:0;right:0;height:60px;background:#fff;border-to
 .sbar button{border:0;background:#eaf0fd;border-radius:10px;font-size:19px;padding:8px 11px;position:relative}.sbar i{font-style:normal;position:absolute;top:-5px;right:-5px;min-width:17px;background:#f26b21;color:#fff;font-size:11px;border-radius:9px}.sbar i:empty{display:none}
 .fpn{display:none;background:rgba(255,255,255,.96);border-radius:14px;padding:4px 12px 8px;margin-top:8px;box-shadow:0 1px 4px #0002}.fpn.open{display:block}
 .chip{display:inline-block;background:#fff7d6;border:1px solid #fcd116;border-radius:20px;padding:6px 12px;font-weight:700;font-size:13px}.cr{text-align:center;font-size:12px;margin:14px 0 0}a.row{color:inherit;text-decoration:none}
+.tabs{display:flex;gap:8px}.tabs button{flex:1;padding:11px;border:0;border-radius:10px;background:#eaf0fd;font-weight:700;color:#0b1f4d;font-size:15px}.tabs button.on{background:#0b1f4d;color:#fff}.scr{overflow-x:auto}
+.bd{font-style:normal;background:#e33;color:#fff;border-radius:9px;font-size:11px;font-weight:700;padding:1px 6px;margin-left:6px}.bd:empty{display:none}.nw td{background:#fff7d6}
 @media print{header,nav,.noprint,#drawer,.map{display:none!important}body{padding:0;background:#fff}.card{box-shadow:none;margin:0}}
 
 body::before{content:"";position:fixed;inset:46px 0 60px;background:url(assets/fond.svg) center top/460px;opacity:.5;pointer-events:none;z-index:0;-webkit-mask-image:linear-gradient(#000 20%,rgba(0,0,0,.35));mask-image:linear-gradient(#000 20%,rgba(0,0,0,.35))}
 main{position:relative;z-index:1}
-#splash{position:fixed;inset:0;z-index:3000;background:linear-gradient(#cfe9f5,#eef8ee);}#splash svg{width:100%;height:100%}
-#splash::before{content:"";position:absolute;inset:0;background:url(assets/accueil.jpg) center/cover;opacity:.22}
-#animbox{position:absolute;inset:0}#splash svg{position:relative}
-#intro{position:absolute;inset:0;z-index:2;background:#0b1f4d;transition:opacity .7s}#intro img{width:100%;height:100%;object-fit:cover;display:block}#intro.off{opacity:0;pointer-events:none}
-#splash.fin{animation:out .7s forwards}
+#splash{position:fixed;inset:0;z-index:3000;background:linear-gradient(#cfe9f5,#eef8ee);animation:out .7s 5.4s forwards}#splash svg{width:100%;height:100%}
 @keyframes out{to{opacity:0;visibility:hidden}}
 .st{fill:none;stroke:#3f7d2c;stroke-width:5;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:dr var(--t,1s) var(--d,0s) ease-out forwards}@keyframes dr{to{stroke-dashoffset:0}}
 .pop{transform-box:fill-box;transform-origin:center bottom;transform:scale(0);animation:pp var(--t,.7s) var(--d,0s) cubic-bezier(.3,1.6,.5,1) forwards}@keyframes pp{to{transform:scale(var(--s,1))}}
@@ -41,71 +34,8 @@ main{position:relative;z-index:1}
 .cow{transform-box:fill-box;transform-origin:center bottom;transform:scale(.4);animation:gr 3.4s 1.4s ease-in-out forwards}@keyframes gr{to{transform:scale(1)}}
 .ti{opacity:0;animation:fi 1s 3.3s forwards}@keyframes fi{to{opacity:1}}
 @media print{body::before{display:none}}
-
-/* ===== v0.9 : mise en page centrée, blocs uniformes ===== */
-header button{width:40px;height:40px;display:flex;align-items:center;justify-content:center;padding:0;flex:none}
-header b{text-align:left}
-.card{text-align:center}.card h3,.card h2{text-align:center;margin:0 0 12px}
-.card label{text-align:left}
-.card p{line-height:1.5}
-.tile{align-items:center;justify-content:center;text-align:center;min-height:112px;border:1px solid #dfe6f2;gap:4px}
-.tile span{line-height:1}
-.row{align-items:center;justify-content:center;text-align:center;min-height:56px;gap:2px;border:1px solid #dfe6f2;border-radius:10px;background:#fff;margin:8px 0;padding:10px 12px}
-.b{display:flex;align-items:center;justify-content:center;text-align:center;min-height:48px}
-.lk{min-height:40px;display:flex;align-items:center;justify-content:center}
-nav a{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;font-size:9.5px;line-height:1.2}
-nav a span{font-size:20px;line-height:1;margin-bottom:2px}
-.dp{text-align:center}.dp{display:flex;flex-direction:column}.dp>*{flex:none}.dp>.sp{flex:1;min-height:10px}.dp a{display:flex;align-items:center;justify-content:flex-start;gap:12px;min-height:44px;padding:0 14px;margin:4px 0;border:1px solid #dfe6f2;border-radius:10px;background:#f8faff}
-.dp hr{border:0;border-top:1px solid #e3e8f0;margin:12px 0}
-th,td{text-align:center;vertical-align:middle}
-.blk{border:1px solid #d6dff0;border-radius:12px;padding:10px 12px 6px;margin:12px 0;background:#fff;text-align:left}
-.blk h4{margin:0 0 8px;text-align:center;font-size:15px;color:#0b1f4d;padding-bottom:8px;border-bottom:2px solid #fcd116}
-.kv{display:flex;flex-direction:column;align-items:center;text-align:center;padding:8px 0;border-bottom:1px solid #eef1f6}
-.kv:last-child{border-bottom:0}.kv small{color:#667}.kv b{white-space:pre-wrap;font-weight:600}
-textarea{display:block;width:100%;min-height:90px;padding:11px;margin-top:4px;border:2px solid #d6dff0;border-radius:10px;background:#eaf0fd;font-size:16px;font-family:inherit;resize:vertical}
-input[type=checkbox]{display:inline-block;width:auto;margin:0;transform:scale(1.3)}
-.chk{display:flex;align-items:center;justify-content:center;gap:10px;font-size:13px;font-weight:600;margin:10px 0;text-align:center}
-nav a{position:relative}.nb{position:absolute;top:3px;left:calc(50% + 4px);min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#e33;color:#fff;font-size:11px;font-style:normal;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;border:2px solid #fff}
-.nbi{margin-left:auto;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#e33;color:#fff;font-size:12px;font-style:normal;font-weight:700;display:flex;align-items:center;justify-content:center}
-#usr img{width:36px;height:36px;padding:0;border-radius:50%;object-fit:cover;border:2px solid #fcd116;display:block;margin:0}
-.av{width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #fcd116;display:flex;align-items:center;justify-content:center;background:#0b1f4d;color:#fff;font-weight:700;font-size:26px;margin:0}
-.av.s{width:38px;height:38px;border-width:2px;font-size:16px;flex:none}
-.me{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0 0}.me .av{width:76px;height:76px;font-size:30px}.me small{color:#556;line-height:1.4}
-.pav{position:relative;width:120px;height:120px;margin:0 auto 12px}.pav .av{width:120px;height:120px;font-size:48px}
-.cam{position:absolute;right:-2px;bottom:-2px;background:#fff;border:2px solid #d6dff0;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-size:18px}
-.pw{display:flex;gap:10px;align-items:center}.pi{display:flex;flex-direction:column;text-align:left}.pi small{margin:0}
-[hidden]{display:none!important}
-.demo{display:inline-block;background:#fcd116;color:#0b1f4d;font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;margin-left:4px;vertical-align:middle}
-.mini{border:1px solid #f0c9c9;background:#fff5f5;border-radius:8px;padding:4px 8px;font-size:15px}
-.gg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}.gi{display:flex;flex-direction:column;gap:6px}.gi img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px}
-.ga{display:flex;gap:6px}.ga button{flex:1;min-height:40px;border:1px solid #dfe6f2;border-radius:10px;background:#f6f8fc;font-size:18px}
-#lb{position:fixed;inset:0;background:#000d;z-index:4000;display:flex;align-items:center;justify-content:center}#lb img{max-width:96vw;max-height:88vh;border-radius:8px}
-#lb button{position:absolute;top:12px;right:12px;width:44px;height:44px;border-radius:50%;border:0;background:#fff;font-size:20px;font-weight:700}
-#eph{position:fixed;left:12px;right:12px;bottom:72px;z-index:1200;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
-.ep{pointer-events:auto;display:flex;align-items:center;background:#fff;border:2px solid #fcd116;border-radius:999px;box-shadow:0 4px 14px #0004;animation:epin .35s ease-out}
-.ep button{background:none;border:0;padding:11px 8px 11px 18px;font-weight:700;color:#0b1f4d;font-size:14px}
-.ep b{width:34px;height:34px;margin-right:6px;border-radius:50%;background:#eef1f6;display:flex;align-items:center;justify-content:center;font-size:15px;color:#0b1f4d}
-@keyframes epin{from{opacity:0;transform:translateY(14px)}}
-.pw{cursor:pointer}
-/* carte plein écran */
-.fsb{background:#fff;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:20px;border-radius:4px;border:2px solid rgba(0,0,0,.25);text-decoration:none;color:#0b1f4d;font-weight:700}
-.mapfs{position:fixed!important;inset:0!important;height:100%!important;width:100%!important;min-height:0!important;border-radius:0!important;margin:0!important}
-body.fsmap main{z-index:2500}body.fsmap{overflow:hidden}
-/* forum */
-.thumbs{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:8px 0}
-.th{position:relative;width:72px;height:72px}.th img{width:100%;height:100%;object-fit:cover;border-radius:8px}
-.th b{position:absolute;top:-6px;right:-6px;background:#d9534f;color:#fff;width:22px;height:22px;border-radius:50%;font-size:12px;display:flex;align-items:center;justify-content:center}
-.post{text-align:left}.ph{display:flex;flex-direction:column;border-bottom:1px solid #e3e8f0;padding-bottom:8px;margin-bottom:8px}
-.ph small{color:#667}.pt{white-space:pre-wrap;margin:6px 0;line-height:1.45;text-align:left}
-.pg{display:grid;grid-template-columns:1fr 1fr;gap:6px}.pg img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px}
-.pa{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
-.pa button{flex:1 1 30%;min-height:42px;border:1px solid #dfe6f2;border-radius:10px;background:#f6f8fc;font-size:13px;font-weight:600;color:#0b1f4d}
-.hid{opacity:.75;border:2px dashed #99a}
-.cm{background:#f6f8fc;border-radius:10px;padding:8px 10px;margin:6px 0}.cm p{margin:2px 0;text-align:left}.cm small{color:#667;margin-left:6px}.cm a{color:#d9534f;font-size:12px;font-weight:700}
-.cmf{display:flex;gap:6px;align-items:center;margin-top:8px}.cmf input{margin:0}.cmf .b{width:auto;margin:0;padding:0 14px;flex:none}
-
-</style><link rel="stylesheet" href="fix-menu.css"></head><body>
-<div id="splash" onclick="this.remove()"><div id="intro"><img src="assets/accueil.jpg" alt="Neoferme"></div><div id="animbox"></div><template id="tp"><svg viewBox="0 0 360 520" preserveAspectRatio="xMidYMid slice">
+</style></head><body>
+<div id="splash" onclick="this.remove()"><svg viewBox="0 0 360 520" preserveAspectRatio="xMidYMid slice">
 <rect y="400" width="360" height="120" fill="#86bd5c"/><ellipse cx="110" cy="402" rx="46" ry="9" fill="#7a5632"/>
 <text class="ti" x="180" y="78" text-anchor="middle" font-family="sans-serif" font-weight="800" font-size="40" fill="#0b1f4d">Neoferme</text>
 <text class="ti" x="180" y="106" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#219e56">De la ferme à l'assiette</text>
@@ -120,12 +50,8 @@ body.fsmap main{z-index:2500}body.fsmap{overflow:hidden}
 <path d="M-15 -8l7 -6 5 6 6 -6 7 6" fill="none" stroke="#d9cdb4" stroke-width="2"/></g>
 <g transform="translate(232 492)"><g class="cow"><path d="M-44 -34q-12 8-8 30" fill="none" stroke="#333" stroke-width="3"/><g fill="#fff" stroke="#333" stroke-width="2"><rect x="-38" y="-30" width="9" height="30"/><rect x="-24" y="-30" width="9" height="30"/><rect x="18" y="-30" width="9" height="30"/><rect x="32" y="-30" width="9" height="30"/><rect x="-46" y="-64" width="92" height="38" rx="14"/><rect x="40" y="-72" width="28" height="28" rx="9"/></g>
 <ellipse cx="-20" cy="-48" rx="10" ry="7" fill="#333"/><ellipse cx="14" cy="-42" rx="8" ry="6" fill="#333"/><rect x="58" y="-56" width="12" height="12" rx="5" fill="#f4b6b6"/><circle cx="52" cy="-62" r="2.2" fill="#222"/><path d="M44 -72q-3-9 3-10M62 -72q3-9-3-10" fill="none" stroke="#c9b27c" stroke-width="3"/></g></g>
-</svg></template></div>
-<script>(function(){var sp=document.getElementById("splash"),seen=false;try{seen=!!sessionStorage.sp;sessionStorage.sp=1}catch(e){}
-if(seen){sp.remove();return}
-setTimeout(function(){var b=document.getElementById("animbox");if(!b)return;b.appendChild(document.getElementById("tp").content.cloneNode(true));document.getElementById("intro").className="off"},2400);
-setTimeout(function(){sp.className="fin"},7800);setTimeout(function(){sp.remove()},8600)})()</script>
-<header><button onclick="A.menu()">☰</button><img src="assets/icone-192.png" alt=""><b>Neoferme</b><button id="adm" style="display:none" onclick="A.go('admin')" title="Administration">🛠️</button><button onclick="A.go('notif')">🔔<i id="badge"></i></button><button id="usr" onclick="A.user()">👤</button></header>
+</svg></div>
+<script>try{if(sessionStorage.sp)document.getElementById("splash").remove();else{sessionStorage.sp=1;setTimeout(function(){var e=document.getElementById("splash");e&&e.remove()},6200)}}catch(e){}</script>
+<header><button onclick="A.menu()">☰</button><img src="assets/icone-192.png" alt=""><b>Neoferme</b><button onclick="A.go('notif')">🔔<i id="badge"></i></button><button onclick="A.user()">👤</button></header>
 <main id="main"></main><nav id="nav"></nav><div id="drawer"></div>
-<script>window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.DIP=e;if(window.ephInstall)window.ephInstall()})</script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script type="module" src="app.js"></script><script type="module" src="alerte.js?v=1793964590"></script></body></html>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script type="module" src="app.js"></script></body></html>
