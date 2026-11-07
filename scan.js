@@ -2,8 +2,8 @@ const K="nf_scans";
 const hist=()=>{try{return JSON.parse(localStorage.getItem(K)||"[]")}catch(e){return[]}};
 const save=h=>{try{localStorage.setItem(K,JSON.stringify(h.slice(0,30)))}catch(e){}};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const parse=raw=>{const t=String(raw).trim();if(/^M:/i.test(t))return{type:"membre",id:t.slice(2).trim()};
- try{const u=new URL(t);const h=(u.hash||"").replace(/^#\/?/,"");const seg=(h||u.pathname).split("/").filter(Boolean);
+const parse=raw=>{const t=String(raw).trim();if(/^LOT-/i.test(t))return{type:"lot",id:t.toUpperCase()};if(/^M:/i.test(t))return{type:"membre",id:t.slice(2).trim()};
+ try{const u=new URL(t);const h=(u.hash||"").replace(/^#\/?/,"");const mm=h.match(/^(lot|l|m)=(.+)$/);if(mm)return{type:mm[1]==="m"?"membre":mm[1]==="l"?"lot":"fiche",id:decodeURIComponent(mm[2])};const seg=(h||u.pathname).split("/").filter(Boolean);
   const id=u.searchParams.get("id")||u.searchParams.get("e")||seg[seg.length-1]||t;
   return{type:/membre|profil/i.test(h+u.search)?"membre":"fiche",id:decodeURIComponent(id)}}catch(e){}
  return{type:"fiche",id:t}};
@@ -12,10 +12,10 @@ let st=null,raf=0,ov=null;
 const stop=()=>{cancelAnimationFrame(raf);if(st){st.getTracks().forEach(t=>t.stop());st=null}if(ov){ov.remove();ov=null}};
 const loadJs=()=>new Promise(r=>{if(window.jsQR)return r(true);const s=document.createElement("script");s.src="jsqr.min.js";s.onload=()=>r(!!window.jsQR);s.onerror=()=>r(false);document.head.appendChild(s)});
 const refresh=()=>{const e=document.getElementById("scl");if(e)e.innerHTML=histH()};
-const histH=()=>hist().map((r,i)=>`<a class="row" onclick="SCAN.go(${i})"><b>${r.type==="membre"?"👤 Membre":"🌾 Lot / exploitation"} · ${esc(r.id)}</b><small>${new Date(r.ts).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"})}</small></a>`).join("")||"<p class='mut'>Aucun scan pour l'instant.</p>";
+const histH=()=>hist().map((r,i)=>`<a class="row" onclick="SCAN.go(${i})"><b>${r.type==="membre"?"👤 Membre":r.type==="lot"?"🏷️ Lot":"🌾 Exploitation"} · ${esc(r.id)}</b><small>${new Date(r.ts).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"})}</small></a>`).join("")||"<p class='mut'>Aucun scan pour l'instant.</p>";
 const found=(txt,mode)=>{const r=parse(txt);stop();
  if(mode==="admin"){const h=hist();h.unshift({...r,ts:Date.now()});save(h);refresh();
-  if(confirm("Détecté : "+(r.type==="membre"?"membre ":"lot / exploitation ")+r.id+"\nOuvrir la fiche ?"))go(r)}
+  if(confirm("Détecté : "+(r.type==="membre"?"membre ":r.type==="lot"?"lot ":"exploitation ")+r.id+"\nOuvrir la fiche ?"))go(r)}
  else go(r)};
 async function open(mode){stop();
  ov=document.createElement("div");ov.style.cssText="position:fixed;inset:0;z-index:99999;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center";

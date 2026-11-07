@@ -70,7 +70,7 @@ const canForum = () => !!U && ["admin", "eleveur", "agriculteur"].includes(ROLE)
 const PUB = [["home", "🏠", "Accueil"], ["forum", "💬", "Forum"], ["how", "❓", "Aide"], ["about", "ℹ️", "À propos"], ["login", "🔑", "Connexion"]];
 const TABS = [["home", "🏠", "Accueil"], ["saisie", "✍️", "Saisie"], ["fermes", "🌾", "Exploitations"], ["national", "📊", "National"], ["trace", "🔎", "Traçabilité"], ["forum", "💬", "Forum"], ["reseau", "🤝", "Réseau"]];
 const tabs = () => TABS;
-A.go = (v, id) => { if (!U && !["home", "forum", "membre", "how", "about", "login"].includes(v)) v = "login"; view = v; cur = id || null; $("#drawer").classList.remove("open"); window.scrollTo(0, 0); render(); };
+A.go = (v, id) => { if (!U && !["home", "forum", "membre", "how", "about", "login", "lot"].includes(v)) v = "login"; view = v; cur = id || null; $("#drawer").classList.remove("open"); window.scrollTo(0, 0); render(); };
 A.menu = () => {
   const top = U ? [["home", "🏠", "Accueil"], ["profil", "👤", "Mon profil"], ["forum", "💬", "Forum"], ["reseau", "🤝", "Réseau"], ["notif", "🔔", "Notifications"], ["fermes", "🌾", "Exploitations"], ["saisie", "✍️", "Saisie"], ["national", "📊", "National"], ["trace", "🔎", "Traçabilité"]]
     : [["home", "🏠", "Accueil"], ["forum", "💬", "Forum"], ["login", "🔑", "Connexion"]];
@@ -93,7 +93,7 @@ function render() {
   const main = $("#main");
   if (!U && !["home", "forum", "membre", "how", "about"].includes(view)) view = "login";
   if (!U && view === "login") { main.innerHTML = loginV(); return; }
-  main.innerHTML = ({ home: homeV, saisie: saisieV, fermes: fermesV, national: nationalV, trace: traceV, notif: notifV, how: howV, about: aboutV, admin: adminV, fiche: ficheV, nouveau: nouveauV, forum: forumV, profil: profilV, membre: membreV, reseau: () => A.reseauV() }[view] || homeV)();
+  main.innerHTML = ({ home: homeV, saisie: () => saisieV() + lotsBtn(), fermes: fermesV, national: nationalV, trace: traceV, notif: notifV, how: howV, about: aboutV, admin: adminV, fiche: ficheV, lot: lotV, lots: lotsV, etiq: etiqV, nouveau: nouveauV, forum: forumV, profil: profilV, membre: membreV, reseau: () => A.reseauV() }[view] || homeV)();
   if (view === "home" || view === "national") initMap();
   if (view === "nouveau") { A.sect(); A.pre(); }
   if (view === "forum") A.fload();
@@ -287,12 +287,77 @@ const saisieV = () => { const l = EX.filter(e => e.uid === U.uid && !e.demo);
     : `<p class="mut">Ajoutez d'abord une exploitation.</p><button class="b g" onclick="A.go('nouveau')">➕ Ajouter</button>`}</div>`; };
 A.saisie = async () => { try { await addDoc(collection(db, "saisies"), { uid: U.uid, exploId: $("#sx").value, date: $("#sd").value, morts: num($("#sm").value), aliment: num($("#sa").value), vaccin: $("#sv").value, created: serverTimestamp() }); await load(); A.go("home"); } catch (x) { $("#msg").textContent = x.code; } };
 
+// ---- lots : un QR par lot (de la ferme à l'assiette) ----
+if (location.hash.startsWith("#l=")) { view = "lot"; cur = decodeURIComponent(location.hash.slice(3)); }
+const lotUrl = id => location.origin + location.pathname + "#l=" + encodeURIComponent(id);
+const lotQr = (id, n = 200) => "https://api.qrserver.com/v1/create-qr-code/?size=" + n + "x" + n + "&data=" + encodeURIComponent(lotUrl(id));
+const lotsBtn = () => `<div class="card"><h3>🏷️ Lots et étiquettes QR</h3><p class="mut">Créez un lot pour chaque récolte ou abattage, puis imprimez les autocollants à coller sur les produits.</p><button class="b n" onclick="A.go('lots')">📦 Mes lots</button></div>`;
+A.find = v => { if (!v) return; if (/^LOT-/i.test(v)) A.go("lot", v.toUpperCase()); else A.go("fiche", v); };
+async function lotsLoad() { const out = []; try { const s = await getDocs(collection(db, "lots")); const f = d => out.push({ id: d.id, ...d.data() }); if (s.docs) s.docs.forEach(f); else if (s.forEach) s.forEach(f); } catch (e) {} return out; }
+function lotsV() {
+  setTimeout(() => A.lotsFill(), 0);
+  const l = EX.filter(e => e.uid === U.uid && !e.demo);
+  return `<div class="card"><h3>🏷️ Créer un lot</h3>${l.length ? `<label>Exploitation<select id="lx">${l.map(e => `<option value="${e.id}">${esc(e.nom)}</option>`).join("")}</select></label>
+<label>Produit<input id="lp" placeholder="Ex. poulets, ananas, miel"></label>
+<label>Quantité<input id="lq" type="number" value="0"></label>
+<label>Unité<select id="lu"><option>kg</option><option>pièces</option><option>litres</option><option>sacs</option><option>caisses</option></select></label>
+<label>Date de récolte / abattage<input id="ld" type="date" value="${new Date().toISOString().slice(0, 10)}"></label>
+<label>Remarque (facultatif)<input id="ln"></label>
+<button class="b g" onclick="A.lotNew()">Créer le lot et son QR</button><p id="lmsg" class="err"></p>` : `<p class="mut">Ajoutez d'abord une exploitation.</p><button class="b g" onclick="A.go('nouveau')">➕ Ajouter</button>`}</div><div id="lotl" class="card"><p class="mut cr">Chargement des lots…</p></div>`;
+}
+A.lotsFill = async () => {
+  const b = $("#lotl"); if (!b) return;
+  const mine = (await lotsLoad()).filter(l => l.uid === U.uid).sort((x, y) => (y.ts || 0) - (x.ts || 0));
+  b.innerHTML = `<h3>📦 Mes lots (${mine.length})</h3>` + (mine.map(l => `<div class="row" onclick="A.go('lot','${l.id}')"><b>${esc(l.produit)} · ${esc(l.quantite)} ${esc(l.unite)}</b><small>${esc(l.exploNom)} · ${esc(l.date)} · ${esc(l.id)}</small></div>`).join("") || "<p class='mut'>Aucun lot pour le moment.</p>");
+};
+A.lotNew = async () => {
+  const msg = $("#lmsg"), ex = EX.find(e => e.id === $("#lx").value), produit = $("#lp").value.trim();
+  if (!ex) { msg.textContent = "Choisissez une exploitation."; return; }
+  if (!produit) { msg.textContent = "Indiquez le produit."; return; }
+  const id = "LOT-" + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 5).toUpperCase();
+  try {
+    await setDoc(doc(db, "lots", id), { uid: U.uid, exploId: ex.id, exploNom: ex.nom, produit, quantite: num($("#lq").value), unite: $("#lu").value, date: $("#ld").value, note: $("#ln").value.trim(), ts: Date.now() });
+    A.go("lot", id);
+  } catch (x) { msg.textContent = x.code || x.message; }
+};
+function lotV() { setTimeout(() => A.lotFill(), 0); return `<div id="lotb"><div class="card"><p class="mut cr">Chargement du lot…</p></div></div>`; }
+A.lotFill = async () => {
+  const b = $("#lotb"); if (!b) return;
+  let l = null; try { const d = await getDoc(doc(db, "lots", cur)); l = d.exists() ? { id: cur, ...d.data() } : null; } catch (e) {}
+  if (!l) { b.innerHTML = `<div class="card"><h3>🏷️ Lot introuvable</h3><p class="mut">Code : ${esc(cur)}</p><button class="b n" onclick="A.go('trace')">← Traçabilité</button></div>`; return; }
+  const e = EX.find(x => x.id === l.exploId), mine = !!U && l.uid === U.uid;
+  b.innerHTML = `<div class="card" id="print"><h3>🏷️ Lot : ${esc(l.produit)}</h3>
+<div class="kv"><small>Code du lot</small><b>${esc(l.id)}</b></div>
+<div class="kv"><small>Quantité</small><b>${esc(l.quantite)} ${esc(l.unite)}</b></div>
+<div class="kv"><small>Date de récolte / abattage</small><b>${esc(l.date)}</b></div>
+${l.note ? `<div class="kv"><small>Remarque</small><b>${esc(l.note)}</b></div>` : ""}
+<div class="kv"><small>Ferme d'origine</small><b>${esc(l.exploNom || (e && e.nom) || "–")}</b></div>
+${e ? `<p class="mut">📍 ${esc([e.ville, e.province].filter(Boolean).join(", "))}</p>` : ""}
+<img alt="QR du lot" style="width:180px;height:180px;display:block;margin:8px auto" src="${lotQr(l.id)}"></div>
+<div class="card noprint">${e && U ? `<button class="b n" onclick="A.go('fiche','${e.id}')">🌾 Voir la ferme</button>` : ""}${mine ? `<button class="b g" onclick="A.go('etiq','${l.id}')">🏷️ Étiquettes autocollantes</button>` : ""}<button class="b n" onclick="print()">🖨️ Imprimer</button>${mine || ROLE === "admin" ? `<button class="b r" onclick="A.lotDel('${l.id}')">Supprimer le lot</button>` : ""}</div>`;
+};
+A.lotDel = async id => { if (!confirm("Supprimer ce lot ? Les étiquettes déjà collées ne fonctionneront plus.")) return; try { await deleteDoc(doc(db, "lots", id)); A.go("lots"); } catch (x) { alert(x.code || x.message); } };
+let ETL = null;
+function etiqV() { setTimeout(() => A.etiqFill(), 0); return `<div id="etb"><div class="card"><p class="mut cr">Chargement…</p></div></div>`; }
+A.etiqFill = async () => {
+  const b = $("#etb"); if (!b) return;
+  try { const d = await getDoc(doc(db, "lots", cur)); ETL = d.exists() ? { id: cur, ...d.data() } : null; } catch (e) { ETL = null; }
+  if (!ETL) { b.innerHTML = `<div class="card"><h3>Lot introuvable</h3><button class="b n" onclick="A.go('lots')">← Mes lots</button></div>`; return; }
+  b.innerHTML = `<style>.lab{display:inline-block;width:46%;margin:1%;border:1px dashed #888;padding:6px;text-align:center;font-size:12px;vertical-align:top;break-inside:avoid;background:#fff;color:#000}.lab img{width:110px;height:110px}</style><div class="card noprint"><h3>🏷️ Étiquettes du lot</h3><p class="mut">${esc(ETL.produit)} · ${esc(ETL.exploNom)} · ${esc(ETL.date)}</p><label>Nombre d'étiquettes<input id="en" type="number" value="12" min="1" max="60" oninput="A.etiqN()"></label><button class="b g" onclick="print()">🖨️ Imprimer la planche</button><button class="b n" onclick="A.go('lot','${ETL.id}')">← Retour au lot</button></div><div id="etg"></div>`;
+  A.etiqN();
+};
+A.etiqN = () => {
+  const g = $("#etg"); if (!g || !ETL) return;
+  const n = Math.max(1, Math.min(60, parseInt($("#en").value) || 12));
+  g.innerHTML = Array.from({ length: n }, () => `<div class="lab"><img alt="QR" src="${lotQr(ETL.id, 140)}"><br><b>${esc(ETL.produit)}</b><br>${esc(ETL.exploNom)}<br>${esc(ETL.date)}<br><small>${esc(ETL.id)}</small></div>`).join("");
+};
+
 // ---- national / notifs / divers ----
 const byProv = () => { const o = {}; EX.forEach(e => (o[e.province] ||= []).push(e)); return o; };
 const nationalV = () => `<div id="map" class="map"></div><div class="card"><h3>Mortalité moyenne par province (%)</h3>${Object.entries(byProv()).map(([p, l]) => { const m = l.reduce((a, e) => a + mort(e), 0) / l.length; return `<div class="bar"><span>${esc(p)}</span><i style="width:${Math.min(m * 10, 100)}%"></i><b>${m.toFixed(1)}</b></div>`; }).join("") || "<p class='mut'>Pas encore de données.</p>"}</div>`;
 const notifV = () => { const nf = unreadForum(), al = alerts();
   return (isStaff() ? visNotif() : "") + `<div class="card"><h3>🔔 Notifications</h3>${nf ? `<div class="row" onclick="A.go('forum')"><b>💬 ${nf} nouvelle(s) publication(s) dans le forum</b><small>Toucher pour lire</small></div>` : ""}${al.map(e => `<div class="row" onclick="A.go('fiche','${e.id}')"><b>${NEWA.includes(e.id) ? "🆕 " : ""}${esc(e.nom)}</b><small>Mortalité ${mort(e).toFixed(1)} % (> 5 %) · ${esc(e.ville)}</small></div>`).join("")}${!nf && !al.length ? "<p class='mut'>Aucune notification.</p>" : ""}</div>`; };
-const traceV = () => `<div class="card"><h3>🔎 Traçabilité</h3><label>Code de l'exploitation / lot<input id="tc"></label><button class="b g" onclick="A.go('fiche',$('#tc').value.trim())">Rechercher</button><button class="b n" onclick="SCAN.open('trace')">📷 Scanner un QR code (lot ou membre)</button></div>`;
+const traceV = () => `<div class="card"><h3>🔎 Traçabilité</h3><label>Code de l'exploitation / lot<input id="tc"></label><button class="b g" onclick="A.find($('#tc').value.trim())">Rechercher</button><button class="b n" onclick="SCAN.open('trace')">📷 Scanner un QR code (lot ou membre)</button></div>`;
 const howV = () => `<div class="card"><h3>❓ Comment ça marche</h3><p>1. <b>Inscrivez</b> votre exploitation (élevage ou agriculture).<br>2. <b>Saisie</b> quotidienne : pertes, intrants, vaccins.<br>3. <b>Alertes</b> automatiques si mortalité anormale.<br>4. <b>National</b> : suivi cartographique et statistiques.<br>5. <b>Traçabilité</b> : QR code par exploitation.</p></div>`;
 const REAL = [["PC-INFORMATIQUE (ce site)","https://pcinformatique28-cloud.github.io/pc-informatique-site/","Sites, applications & PWA sur mesure"],["AMBI241","https://ambi2412026-debug.github.io/ambi241","Annuaire des bars, restos et boîtes de nuit"],["MAGERANTE","https://magerante241-boop.github.io/magerante/","Caisse et inventaire pour bars, snacks et clubs"],["MALAGA","https://malagagabon-dot.github.io/malaga-gabon/","Location immobilière à Libreville"],["Gabon Sport Connect","https://gabon-sport-connect.web.app","Clubs, fédérations et athlètes"],["LE WORK","https://lework63-2b761.web.app","Clients et techniciens validés"],["BIJOU","https://bijouesno1-bit.github.io/bijou/","Billetterie en ligne sécurisée"],["TROC MAISON","https://trocmaison106-rgb.github.io/troc-maison/","Petites annonces de troc"],["ANEG","https://pcinformatique28-cloud.github.io/aneg-gabon/","Annuaire national des églises"],["LAV","https://gabonlave-spec.github.io/lavegabon/","Laveurs et laveuses au Gabon"]];
 const aboutV = () => `<div class="card"><h3>🌱 Neoferme</h3><p><b>De la ferme à l'assiette</b><br>Application de suivi des exploitations agricoles et d'élevage du Gabon : inscription des fermes, saisies quotidiennes, alertes, carte nationale et traçabilité. Version 1.2.</p><span class="chip">11<sup>e</sup> réalisation du studio PC-INFORMATIQUE</span></div>
