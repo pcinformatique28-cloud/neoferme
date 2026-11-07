@@ -64,14 +64,15 @@ A.go = (v, id) => { if (!U && !["home", "how", "about", "login"].includes(v)) v 
 A.menu = () => {
   const items = U ? [...TABS, ["notif", "🔔", "Notifications"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"]] : [["home", "🏠", "Accueil"], ["how", "❓", "Comment ça marche"], ["about", "ℹ️", "À propos de"], ["login", "🔑", "Connexion"]];
   if (isStaff()) items.splice(5, 0, ["admin", "🛠️", "Administration" + (newVis() ? `<i class="bd">${newVis()}</i>` : "")]);
-  $("#drawer").innerHTML = `<div class="dp"><b>Neoferme</b><br><small>${U ? esc(U.email) + "<br>Rôle : " + esc(ROLE) : "Visiteur"}</small><hr>${items.map(i => `<a onclick="A.go('${i[0]}')">${i[1]} ${i[2]}</a>`).join("")}${U ? '<a onclick="A.out()">🚪 Déconnexion</a>' : ""}</div><div class="dbg" onclick="A.menu()"></div>`;
+  if (ROLE === "admin") items.splice(6, 0, ["trk", "📡", "Tracking<i class=\"bd nbt\">" + (newVis() || "") + "</i>"]);
+  $("#drawer").innerHTML = `<div class="dp"><b>Neoferme</b><br><small>${U ? esc(U.email) + "<br>Rôle : " + esc(ROLE) : "Visiteur"}</small><hr>${items.map(i => `<a onclick="${i[0] === "trk" ? "A.trk()" : `A.go('${i[0]}')`}">${i[1]} ${i[2]}</a>`).join("")}${U ? '<a onclick="A.out()">🚪 Déconnexion</a>' : ""}</div><div class="dbg" onclick="A.menu()"></div>`;
   $("#drawer").classList.toggle("open");
 };
 A.user = () => U ? A.menu() : A.go("login");
 A.out = () => { signOut(auth); $("#drawer").classList.remove("open"); };
 
 function render() {
-  $("#nav").innerHTML = (U ? TABS : PUB).map(t => `<a class="${view === t[0] ? "on" : ""}" onclick="A.go('${t[0]}')"><span>${t[1]}</span>${t[2]}</a>`).join("");
+  $("#nav").innerHTML = (U ? (ROLE === "admin" ? [...TABS, ["trk", "📡", "Tracking"]] : TABS) : PUB).map(t => { const k = t[0] === "trk"; return `<a class="${(k ? view === "admin" && atab === "track" : view === t[0]) ? "on" : ""}" onclick="${k ? "A.trk()" : `A.go('${t[0]}')`}"><span>${t[1]}</span>${t[2]}${k ? `<i class="bd nbt">${newVis() || ""}</i>` : ""}</a>`; }).join("");
   updBadges();
   if (map) { map.remove(); map = null; }
   const main = $("#main");
@@ -276,7 +277,7 @@ A.vcsv = () => { const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`, r = 
 
 const newVis = () => U && isStaff() ? VIS.filter(v => v.ts > SEEN && v.uid !== U.uid).length : 0;
 function markSeen() { SEEN = VIS.reduce((m, v) => Math.max(m, v.ts || 0), SEEN); try { localStorage.nf_seen = SEEN; } catch (e) {} updBadges(); }
-function updBadges() { const n = newVis(), a = alerts().length + n, b = $("#badge"), t = $("#bt"); if (b) b.textContent = a > 99 ? "99+" : a || ""; if (t) t.textContent = n || ""; }
+function updBadges() { const n = newVis(), a = alerts().length + n, b = $("#badge"), t = $("#bt"); if (b) b.textContent = a > 99 ? "99+" : a || ""; if (t) t.textContent = n || ""; document.querySelectorAll(".nbt").forEach(x => x.textContent = n || ""); }
 function watchVis() {
   if (unsub) { unsub(); unsub = null; } VIS = [];
   if (!U || !isStaff()) return;
@@ -287,8 +288,9 @@ function watchVis() {
     else { updBadges(); if (view === "notif") render(); }
   }, () => {});
 }
-const visNotif = () => { const l = VIS.filter(v => v.ts > SEEN && v.uid !== U.uid);
+const visNotif = () => { const l = VIS.filter(v => v.ts > SEEN && v.uid !== U.uid); if (!l.length) return "";
   return `<div class="card"><h3>📡 Nouvelles connexions <span class="bd">${l.length || ""}</span></h3>${l.slice(0, 10).map(v => `<div class="row"><b>${esc(v.nom)} · ${esc(v.type)}</b><small>${esc(v.ville)}, ${esc(v.pays)} · ${new Date(v.ts).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</small></div>`).join("") || "<p class='mut'>Aucune nouvelle connexion.</p>"}<button class="b n" onclick="A.go('admin');A.atab('track')">Ouvrir le tracking</button>${l.length ? '<button class="b g" onclick="A.seen()">✔️ Marquer comme vu</button>' : ""}</div>`; };
 A.seen = () => { markSeen(); render(); };
+A.trk = () => { A.go("admin"); A.atab("track"); };
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
