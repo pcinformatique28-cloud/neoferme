@@ -1,14 +1,16 @@
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, addDoc, collection, getDocs, deleteDoc, serverTimestamp, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, doc, collection, serverTimestamp, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { PROVINCES } from "./gabon.js";
+import { getDoc, setDoc, addDoc, getDocs, deleteDoc, initStatus } from "./offline.js";
 
 // ---- config Firebase : réutilise firebase-config.js existant ----
 let cfg;
 try { const m = await import("./firebase-config.js"); cfg = Object.values(m).find(v => v && v.apiKey) || (m.default && m.default.apiKey ? m.default : null); } catch (e) {}
 if (!cfg && !getApps().length) { try { const t = await (await fetch("firebase-config.js")).text(); const r = t.match(/\{[^{}]*apiKey[^{}]*\}/); if (r) cfg = new Function("return " + r[0])(); } catch (e) {} }
 const app = getApps()[0] || initializeApp(cfg || window.firebaseConfig);
-const auth = getAuth(app), db = getFirestore(app);
+const auth = getAuth(app);
+let db; try { db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch (e) { db = getFirestore(app); }
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -158,7 +160,7 @@ function refreshHome() {
 function initMap() {
   if (!window.L || !$("#map")) return;
   map = L.map("map", { minZoom: 5, maxBounds: [[-4.8, 8], [2.9, 15]] }).setView([-0.8, 11.6], 6);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap" }).addTo(map);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { crossOrigin: true, attribution: "© OpenStreetMap" }).addTo(map);
   ML = L.layerGroup().addTo(map);
   if (view === "home") refreshHome(); else EX.filter(e => e.lat).forEach(e => mkr(e).addTo(ML));
   if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => L.marker([p.coords.latitude, p.coords.longitude]).addTo(map).bindPopup("📍 Vous êtes ici"), () => {});
@@ -249,7 +251,7 @@ let atab = "synth", VIS = [], TF = { t: "", q: "" }, PREV = 0, SEEN = 0, unsub =
 const dev = () => { const u = navigator.userAgent; return (/Tablet|iPad/i.test(u) ? "Tablette" : /Mobi|Android|iPhone/i.test(u) ? "Mobile" : "Ordinateur") + " · " + (/Edg/.test(u) ? "Edge" : /OPR|Opera/.test(u) ? "Opera" : /Chrome/.test(u) ? "Chrome" : /Firefox/.test(u) ? "Firefox" : /Safari/.test(u) ? "Safari" : "Autre"); };
 async function track() {
   try {
-    const key = "nf_t_" + (U ? U.uid : "v"); if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1");
+    if (!navigator.onLine) return; const key = "nf_t_" + (U ? U.uid : "v"); if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1");
     let vid = localStorage.getItem("nf_vid"); if (!vid) { vid = crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2); localStorage.setItem("nf_vid", vid); }
     let g = {}; try { const c = new AbortController(); setTimeout(() => c.abort(), 4000); g = await (await fetch("https://ipwho.is/", { signal: c.signal })).json(); } catch (e) {}
     const L = (x, n = 60) => String(x || "").slice(0, n), d = { type: U ? ROLE : "visiteur", nom: L(U ? NOM || "Membre" : "Visiteur"), pays: L(g.country || "Inconnu"), ville: L(g.city || "Inconnue"), region: L(g.region), appareil: L(dev()), page: L(view, 20), vid: L(vid, 40), ts: Date.now() };
@@ -293,4 +295,6 @@ const visNotif = () => { const l = VIS.filter(v => v.ts > SEEN && v.uid !== U.ui
 A.seen = () => { markSeen(); render(); };
 A.trk = () => { A.go("admin"); A.atab("track"); };
 
+initStatus(db);
+window.addEventListener("online", async () => { try { await load(); if (["home", "fermes", "national", "trace", "notif"].includes(view)) render(); } catch (e) {} });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
